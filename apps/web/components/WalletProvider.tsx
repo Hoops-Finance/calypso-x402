@@ -36,6 +36,7 @@ export interface WalletState {
   connect: () => Promise<void>;
   disconnect: () => void;
   signXdr: (xdr: string) => Promise<string>;
+  fundFromFriendbot: () => Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
 const WalletContext = createContext<WalletState | null>(null);
@@ -119,9 +120,40 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     [address],
   );
 
+  const fundFromFriendbot = useCallback(async () => {
+    if (!address) return { ok: false as const, error: "wallet not connected" };
+    try {
+      const res = await fetch(
+        `https://friendbot.stellar.org?addr=${encodeURIComponent(address)}`,
+      );
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        // Friendbot returns 400 if the account is already funded — surface
+        // that as a friendly message rather than a scary error.
+        if (res.status === 400 && body.includes("createAccountAlreadyExist")) {
+          return { ok: false as const, error: "already funded" };
+        }
+        return { ok: false as const, error: `friendbot ${res.status}` };
+      }
+      return { ok: true as const };
+    } catch (err) {
+      return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
+    }
+  }, [address]);
+
   const value: WalletState = useMemo(
-    () => ({ installed, connected, address, error, loading, connect, disconnect, signXdr }),
-    [installed, connected, address, error, loading, connect, disconnect, signXdr],
+    () => ({
+      installed,
+      connected,
+      address,
+      error,
+      loading,
+      connect,
+      disconnect,
+      signXdr,
+      fundFromFriendbot,
+    }),
+    [installed, connected, address, error, loading, connect, disconnect, signXdr, fundFromFriendbot],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

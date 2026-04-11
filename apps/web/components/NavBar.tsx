@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ConnectWallet } from "./ConnectWallet";
+import { FriendbotButton } from "./FriendbotButton";
 
 export function NavBar() {
   return (
@@ -37,7 +38,10 @@ export function NavBar() {
             </Link>
           </nav>
         </div>
-        <ConnectWallet />
+        <div className="flex items-center gap-3">
+          <FriendbotButton />
+          <ConnectWallet />
+        </div>
       </div>
     </header>
   );
