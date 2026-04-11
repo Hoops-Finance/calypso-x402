@@ -36,4 +36,10 @@ export const ENV = {
   // local UI demos where driving real browser-side payment signing is
   // out of scope. Default off. DO NOT set this in a deployment.
   X402_DEMO_MODE: (process.env.X402_DEMO_MODE ?? "").toLowerCase() === "true",
+
+  // Secret key of the USDC token contract admin. When set, Calypso can
+  // mint fresh USDC directly to any address — bypassing the broken-pool
+  // XLM→USDC swap path entirely on testnet. Empty string means minting
+  // is disabled and we fall back to self-swap.
+  USDC_ADMIN_SECRET: process.env.USDC_ADMIN_SECRET ?? "",
 } as const;

@@ -22,7 +22,14 @@ import {
   BOT_DEPLOY_XLM_FUNDING,
   BOT_SELF_SEED_SWAP_XLM,
 } from "../constants.js";
+import { mintUsdcTo, canMintUsdc } from "./usdcAdmin.js";
 import { logger } from "../logger.js";
+
+// How much USDC to mint directly to each new bot's smart account when
+// the USDC admin key is available. Much more than the LP deposit
+// threshold so there's plenty of headroom for multiple rebalance
+// probes across a session.
+const BOT_USDC_MINT_AMOUNT = 5;
 
 export interface TreasuryWallet {
   keypair: Keypair;
@@ -59,23 +66,38 @@ export async function createBotWallet(botId: string): Promise<BotWallet> {
   await friendbotFund(kp.publicKey());
   const session = await createBotSession(kp);
 
-  // Step 1: fund the smart account with a big chunk of XLM (9000). This
-  // is a single EOA→smart-account SAC transfer. It works the first time
-  // and only the first time — the XLM SAC's EOA-side balance collapses
-  // after one transfer. Which is fine: each bot is a fresh keypair with
-  // a fresh SAC balance, and we only need ONE fund call per bot.
+  // Step 1: fund the smart account with XLM. One shot from EOA to
+  // smart account via the XLM SAC. Works once per fresh keypair.
   await session.session.fundAccountXlm(BOT_DEPLOY_XLM_FUNDING);
 
-  // Step 2: self-seed USDC by swapping a large chunk (4000 XLM) for USDC
-  // inside the smart account. On the Hoops testnet Soroswap pool this
-  // yields ~0.55 USDC, which is enough for the LP bot's 0.5 USDC
-  // deposit threshold. Each bot does this independently — no platform
-  // dependency, no keypair race conditions.
-  //
-  // The platform wallet still exists as the x402 revenue collector and
-  // is visible in the UI as "where your payments go". It does NOT fund
-  // bot USDC on testnet; that would require wrapping/unwrapping XLM
-  // across the SAC, which is cursed.
+  // Step 2: get USDC onto the smart account. Two paths:
+  //   (a) if USDC_ADMIN_SECRET is set we own the test token contract,
+  //       so we mint fresh USDC directly to the smart account. This
+  //       bypasses the broken-pool XLM→USDC swap entirely.
+  //   (b) fall back to the self-swap path for environments where we
+  //       don't have admin access.
+  if (canMintUsdc()) {
+    try {
+      const txHash = await mintUsdcTo(session.smartAccountId, BOT_USDC_MINT_AMOUNT);
+      logger.info(
+        { botId, txHash, usdc: BOT_USDC_MINT_AMOUNT },
+        "wallets: minted USDC directly to bot smart account",
+      );
+    } catch (err) {
+      logger.warn(
+        { botId, err: err instanceof Error ? err.message : err },
+        "wallets: USDC mint failed, falling back to self-swap",
+      );
+      await trySelfSeedSwap(session, botId);
+    }
+  } else {
+    await trySelfSeedSwap(session, botId);
+  }
+
+  return { ...session, botId };
+}
+
+async function trySelfSeedSwap(session: BotSession, botId: string): Promise<void> {
   try {
     const txHash = await session.session.swapXlmToUsdc(BOT_SELF_SEED_SWAP_XLM);
     logger.info(
@@ -88,8 +110,6 @@ export async function createBotWallet(botId: string): Promise<BotWallet> {
       "wallets: bot self-seed swap failed — bot will operate XLM-only",
     );
   }
-
-  return { ...session, botId };
 }
 
 /**
