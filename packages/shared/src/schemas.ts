@@ -76,6 +76,10 @@ export const SessionConfigSchema = z.object({
   duration_minutes: z.number().int().min(1).max(180),
   target_pools: z.array(PoolRefSchema).min(1),
   initial_treasury_xlm: z.number().positive().default(10_000),
+  // How much USDC the orchestrator hands to each bot's smart account
+  // at creation time. LP bots need >= 0.5 USDC to clear the hoops_sdk
+  // addLiquidity50_50 threshold.
+  usdc_per_bot: z.number().positive().default(1),
   demo_mode: z.boolean().default(false),
 });
 export type SessionConfig = z.infer<typeof SessionConfigSchema>;

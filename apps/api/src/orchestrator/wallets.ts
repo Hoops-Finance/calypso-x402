@@ -1,35 +1,30 @@
 /**
- * wallets.ts
- * ----------
- * Session wallet lifecycle:
+ * wallets.ts — session wallet lifecycle.
  *
- *   Treasury  (1 per session, friendbot-funded on testnet)
- *     └── Bot wallets (N per session, funded from friendbot + smart account deploy)
+ * Money flow for each bot:
  *
- * On session close, bots liquidate and return XLM to the treasury. For v0
- * (testnet, 48h), we keep this simple: each bot keypair is funded directly
- * by friendbot rather than routed through the treasury, because friendbot
- * gives every new keypair 10,000 XLM and we don't need real capital flow
- * to demonstrate the architecture. The `treasury -> bot -> treasury` path
- * is exposed via the same functions so a mainnet implementation drops in
- * without touching the orchestrator.
+ *   friendbot ────▶ bot EOA (10k XLM, standard testnet plumbing)
+ *                    │
+ *                    │ fundAccountXlm
+ *                    ▼
+ *                  bot smart account ◀── orchestrator.transferUsdc
+ *                                         (USDC originates at the
+ *                                          orchestrator's smart account,
+ *                                          either from x402 payments in
+ *                                          prod or from admin mint in
+ *                                          testnet demo mode)
+ *
+ * Bots never create USDC. They receive it from the orchestrator. This
+ * mirrors the production model where x402 payments flow in to the
+ * orchestrator and are distributed to per-session bot wallets.
  */
 
 import { Keypair } from "@stellar/stellar-sdk";
+import { toStroops } from "hoops-sdk-core";
 import { createBotSession, type BotSession } from "../router/hoopsRouter.js";
-import {
-  FRIENDBOT_URL,
-  BOT_DEPLOY_XLM_FUNDING,
-  BOT_SELF_SEED_SWAP_XLM,
-} from "../constants.js";
-import { mintUsdcTo, canMintUsdc } from "./usdcAdmin.js";
+import { FRIENDBOT_URL, BOT_DEPLOY_XLM_FUNDING } from "../constants.js";
+import { PlatformWallet } from "./platformWallet.js";
 import { logger } from "../logger.js";
-
-// How much USDC to mint directly to each new bot's smart account when
-// the USDC admin key is available. Much more than the LP deposit
-// threshold so there's plenty of headroom for multiple rebalance
-// probes across a session.
-const BOT_USDC_MINT_AMOUNT = 5;
 
 export interface TreasuryWallet {
   keypair: Keypair;
@@ -55,68 +50,61 @@ export async function createTreasury(): Promise<TreasuryWallet> {
 }
 
 /**
- * Creates a bot wallet: fresh keypair → friendbot → deploy smart account →
- * fund the smart account with some XLM so it can submit transactions.
+ * Creates + funds a bot wallet end-to-end.
  *
- * Callers should await all bot creations in parallel when spinning up a
- * session, since each deploy takes ~5s of network round-trips.
+ *   1. friendbot the fresh EOA   (XLM source)
+ *   2. deploy the Hoops smart account
+ *   3. fund the smart account with XLM from the EOA (SAC transfer)
+ *   4. pull `usdcPerBot` USDC from the orchestrator's smart account
+ *
+ * Step 4's transferUsdc is serialized inside PlatformWallet via an
+ * internal promise queue, so concurrent bot creations don't race on
+ * the orchestrator's sequence number. If the orchestrator is out of
+ * USDC the bot still launches and the LP bot handles the shortage
+ * with a clean skip.
  */
-export async function createBotWallet(botId: string): Promise<BotWallet> {
+export async function createBotWallet(
+  botId: string,
+  usdcPerBot: number,
+): Promise<BotWallet> {
   const kp = Keypair.random();
   await friendbotFund(kp.publicKey());
   const session = await createBotSession(kp);
 
-  // Step 1: fund the smart account with XLM. One shot from EOA to
-  // smart account via the XLM SAC. Works once per fresh keypair.
+  // XLM side: one-shot EOA → smart account transfer via XLM SAC.
+  // Works once per fresh keypair (the SAC tracks balance stingily
+  // after the first transfer, but fresh friendbot accounts always
+  // start with a clean SAC balance).
   await session.session.fundAccountXlm(BOT_DEPLOY_XLM_FUNDING);
 
-  // Step 2: get USDC onto the smart account. Two paths:
-  //   (a) if USDC_ADMIN_SECRET is set we own the test token contract,
-  //       so we mint fresh USDC directly to the smart account. This
-  //       bypasses the broken-pool XLM→USDC swap entirely.
-  //   (b) fall back to the self-swap path for environments where we
-  //       don't have admin access.
-  if (canMintUsdc()) {
-    try {
-      const txHash = await mintUsdcTo(session.smartAccountId, BOT_USDC_MINT_AMOUNT);
-      logger.info(
-        { botId, txHash, usdc: BOT_USDC_MINT_AMOUNT },
-        "wallets: minted USDC directly to bot smart account",
-      );
-    } catch (err) {
-      logger.warn(
-        { botId, err: err instanceof Error ? err.message : err },
-        "wallets: USDC mint failed, falling back to self-swap",
-      );
-      await trySelfSeedSwap(session, botId);
-    }
-  } else {
-    await trySelfSeedSwap(session, botId);
+  // USDC side: orchestrator funds the bot, not the other way around.
+  // This is the architecturally correct direction — bots are pure
+  // consumers of platform-held USDC.
+  try {
+    const platform = PlatformWallet.get();
+    const txHash = await platform.transferUsdc(
+      session.smartAccountId,
+      toStroops(usdcPerBot),
+    );
+    logger.info(
+      { botId, txHash, usdc: usdcPerBot },
+      "wallets: bot received USDC from orchestrator",
+    );
+  } catch (err) {
+    logger.warn(
+      { botId, err: err instanceof Error ? err.message : err },
+      "wallets: orchestrator USDC transfer failed — bot will operate XLM-only",
+    );
   }
 
   return { ...session, botId };
 }
 
-async function trySelfSeedSwap(session: BotSession, botId: string): Promise<void> {
-  try {
-    const txHash = await session.session.swapXlmToUsdc(BOT_SELF_SEED_SWAP_XLM);
-    logger.info(
-      { botId, txHash, xlm: BOT_SELF_SEED_SWAP_XLM },
-      "wallets: bot self-seeded USDC via XLM swap",
-    );
-  } catch (err) {
-    logger.warn(
-      { botId, err: err instanceof Error ? err.message : err },
-      "wallets: bot self-seed swap failed — bot will operate XLM-only",
-    );
-  }
-}
-
 /**
- * Best-effort shutdown. Today this is a no-op: testnet XLM is worthless,
- * and withdrawing LP positions races against the AI reviewer's final tick.
- * On mainnet this would liquidate LP, transfer XLM/USDC back to treasury,
- * and zero out the smart account.
+ * Best-effort shutdown. Today this is a no-op: testnet XLM is worthless
+ * and withdrawing LP positions races the AI reviewer's final tick. On
+ * mainnet this would liquidate LP, transfer XLM/USDC back to the
+ * orchestrator, and zero out the smart account.
  */
 export async function closeBotWallet(_bot: BotWallet): Promise<void> {
   return;

@@ -96,7 +96,7 @@ export function WalletHierarchy({ sessionId, showUser = true, pollMs = 4000 }: P
 
       {sessionId && (
         <>
-          <FlowArrow label="spawns bot wallets (friendbot XLM + self-seeded USDC swap)" />
+          <FlowArrow label="spawns bot wallets + transfers USDC per session plan" />
           <SessionTier session={sessionWallets} />
         </>
       )}

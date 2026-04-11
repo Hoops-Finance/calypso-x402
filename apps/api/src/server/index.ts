@@ -23,7 +23,8 @@ import {
   handlePlatformWallet,
   handleSessionWallets,
   handleWalletByAddress,
-  handlePlatformReseed,
+  handlePlatformTopUp,
+  handleMintUsdcToAddress,
 } from "./routes/wallets.js";
 import { startReviewerLoop } from "../ai/reviewer.js";
 import { listSessions as sessionList, getSession } from "../orchestrator/session.js";
@@ -44,7 +45,8 @@ async function bootstrap(): Promise<void> {
   app.get("/wallets/platform", handlePlatformWallet);
   app.get("/wallets/balance", handleWalletByAddress);
   app.get("/sessions/:sessionId/wallets", handleSessionWallets);
-  app.post("/wallets/platform/reseed", handlePlatformReseed);
+  app.post("/wallets/platform/topup", handlePlatformTopUp);
+  app.post("/admin/mint-usdc", handleMintUsdcToAddress);
 
   // x402-gated routes. The rate limiter for /plan sits in front of x402 so
   // a hostile client can't burn our Gemma quota even if they bypass payment.

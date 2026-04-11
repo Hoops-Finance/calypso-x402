@@ -15,9 +15,14 @@ import { logger } from "../logger.js";
 export async function launchSession(session: Session): Promise<void> {
   logger.info({ sessionId: session.id, botCount: session.botConfigs.length }, "launchSession: starting");
 
-  // Create all bot wallets in parallel.
+  // Create all bot wallets in parallel. friendbot + deploy + XLM
+  // fund all work in parallel (each bot has its own keypair), but the
+  // per-bot USDC transfer inside createBotWallet is serialized by the
+  // platform wallet's internal txQueue so the orchestrator's sequence
+  // number doesn't race.
+  const usdcPerBot = session.config.usdc_per_bot;
   const bots = await Promise.all(
-    session.botConfigs.map((cfg) => createBotWallet(cfg.bot_id)),
+    session.botConfigs.map((cfg) => createBotWallet(cfg.bot_id, usdcPerBot)),
   );
   session.bots = bots;
 

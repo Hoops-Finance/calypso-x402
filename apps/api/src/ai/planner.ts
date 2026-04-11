@@ -56,6 +56,7 @@ function defaultPlan(): PlanResponse {
     duration_minutes: 5,
     target_pools: ["soroswap:USDC/XLM"],
     initial_treasury_xlm: 10_000,
+    usdc_per_bot: 1,
     demo_mode: false,
   };
   const bot_configs: BotConfig[] = [

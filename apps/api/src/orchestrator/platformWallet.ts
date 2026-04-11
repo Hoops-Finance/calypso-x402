@@ -253,13 +253,25 @@ export class PlatformWallet {
   }
 
   /**
-   * Manual re-seed: reruns fundAndSwap. Useful when the orchestrator
-   * has drained its USDC distributing to bots and needs to top up.
-   * Intended to be called from POST /wallets/reseed in demo mode.
+   * Top up the orchestrator's USDC by admin-minting directly to its
+   * smart account. Replaces the old fundAndSwap-based reseed path
+   * which was broken by the XLM SAC's stuck EOA balance after one
+   * transfer. Requires USDC_ADMIN_SECRET to be configured. In a
+   * production Calypso this would be replaced by a real x402 payment
+   * from the user's wallet.
    */
-  async reseed(): Promise<void> {
+  async topUpUsdc(amount: number): Promise<string> {
     await this.ensureInitialized();
-    await this.fundAndSwap();
+    if (!this.smartAccountId) {
+      throw new Error("platformWallet: no smart account");
+    }
+    const { mintUsdcTo, canMintUsdc } = await import("./usdcAdmin.js");
+    if (!canMintUsdc()) {
+      throw new Error(
+        "platformWallet: USDC admin not configured — set USDC_ADMIN_SECRET",
+      );
+    }
+    return mintUsdcTo(this.smartAccountId, amount);
   }
 
   /**

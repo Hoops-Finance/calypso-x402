@@ -22,7 +22,7 @@ async function main(): Promise<void> {
 
   const botId = "noise-1";
   console.log("→ create bot wallet (friendbot + smart account)…");
-  const bot = await createBotWallet(botId);
+  const bot = await createBotWallet(botId, 1);
   console.log(`   pubkey:  ${bot.pubkey}`);
   console.log(`   account: ${bot.smartAccountId}`);
 

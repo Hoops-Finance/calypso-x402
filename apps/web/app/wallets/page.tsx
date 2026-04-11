@@ -2,31 +2,68 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Badge, Button, Card } from "../../components/ui";
+import { Badge, Button, Card, Input } from "../../components/ui";
 import { WalletHierarchy } from "../../components/WalletHierarchy";
+import { useWallet } from "../../components/WalletProvider";
 import { api } from "../../lib/apiClient";
 import { walletApi } from "../../lib/walletApi";
 import type { SessionSummary } from "@calypso/shared";
 
 export default function WalletsPage() {
+  const { address: userAddr, connected } = useWallet();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [reseeding, setReseeding] = useState(false);
-  const [reseedMsg, setReseedMsg] = useState<string | null>(null);
 
-  async function handleReseed() {
-    setReseeding(true);
-    setReseedMsg(null);
-    const result = await walletApi.reseed();
-    if (result.ok) {
-      setReseedMsg("topped up ✓");
-      setTimeout(() => setReseedMsg(null), 4000);
-    } else {
-      setReseedMsg(`error: ${result.error}`);
-      setTimeout(() => setReseedMsg(null), 8000);
+  const [mintAmount, setMintAmount] = useState("100");
+  const [minting, setMinting] = useState(false);
+  const [mintMsg, setMintMsg] = useState<string | null>(null);
+
+  const [fundAmount, setFundAmount] = useState("10");
+  const [funding, setFunding] = useState(false);
+  const [fundMsg, setFundMsg] = useState<string | null>(null);
+
+  async function handleMintToMe() {
+    if (!userAddr) {
+      setMintMsg("connect Freighter first");
+      setTimeout(() => setMintMsg(null), 4000);
+      return;
     }
-    setReseeding(false);
+    const amount = Number(mintAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMintMsg("invalid amount");
+      return;
+    }
+    setMinting(true);
+    setMintMsg(null);
+    const result = await walletApi.mintUsdcToAddress(userAddr, amount);
+    if (result.ok) {
+      setMintMsg(`✓ minted ${amount} USDC to your wallet`);
+      setTimeout(() => setMintMsg(null), 4000);
+    } else {
+      setMintMsg(`error: ${result.error}`);
+      setTimeout(() => setMintMsg(null), 8000);
+    }
+    setMinting(false);
+  }
+
+  async function handleFundCalypso() {
+    const amount = Number(fundAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setFundMsg("invalid amount");
+      return;
+    }
+    setFunding(true);
+    setFundMsg(null);
+    const result = await walletApi.topUp(amount);
+    if (result.ok) {
+      setFundMsg(`✓ orchestrator topped up with ${amount} USDC`);
+      setTimeout(() => setFundMsg(null), 4000);
+    } else {
+      setFundMsg(`error: ${result.error}`);
+      setTimeout(() => setFundMsg(null), 8000);
+    }
+    setFunding(false);
   }
 
   useEffect(() => {
@@ -36,7 +73,6 @@ export default function WalletsPage() {
         const res = await api.listSessions();
         if (!alive) return;
         setSessions(res.sessions);
-        // Auto-pick the first running session on first load.
         setSelectedSessionId((prev) => {
           if (prev) return prev;
           const running = res.sessions.find((s) => s.status === "running");
@@ -61,19 +97,15 @@ export default function WalletsPage() {
       <div className="mb-8">
         <h1 className="text-3xl md:text-4xl font-bold">wallet hierarchy</h1>
         <p className="mt-2 text-muted-foreground max-w-2xl">
-          Calypso uses three tiers of Stellar accounts. You (via Freighter) pay Calypso&apos;s
-          orchestrator in USDC through x402. The orchestrator creates ephemeral bot wallets per
-          session — each with its own EOA and a Hoops smart account — and those bots route trades
-          through the Hoops router across every DEX on testnet.
+          Three tiers of Stellar accounts. You fund Calypso&apos;s orchestrator with USDC (via x402
+          in production; via admin mint on testnet). The orchestrator holds working capital and
+          distributes XLM + USDC to each bot wallet at session launch.
         </p>
       </div>
 
       {error && (
         <Card className="mb-4 border-destructive/40">
           <div className="text-xs text-destructive">api error: {error}</div>
-          <div className="text-xs text-muted-foreground mt-1">
-            Is the API running on http://localhost:9990?
-          </div>
         </Card>
       )}
 
@@ -113,30 +145,63 @@ export default function WalletsPage() {
 
       <WalletHierarchy sessionId={selectedSessionId ?? undefined} />
 
-      {/* Orchestrator top-up control */}
-      <Card className="mt-4 border-[hsl(var(--warning)/0.35)]">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold">Top up orchestrator USDC</div>
+      {/* Admin actions */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Mint USDC to user */}
+        <Card className="border-primary/40">
+          <div className="mb-3">
+            <div className="text-sm font-semibold">1. Mint test USDC to your wallet</div>
             <div className="text-xs text-muted-foreground mt-1">
-              Runs another {" "}
-              <code className="text-primary">fundAccountXlm(9500) → swapXlmToUsdc(8500)</code> cycle on
-              the platform wallet. Use when orchestrator USDC runs low from seeding bots.
+              Testnet shim for &quot;user has money&quot;. Uses the USDC admin key to mint directly
+              to your connected Freighter address.
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {reseedMsg && (
-              <span className="text-xs text-muted-foreground">{reseedMsg}</span>
-            )}
-            <Button onClick={() => void handleReseed()} disabled={reseeding}>
-              {reseeding ? "topping up…" : "top up"}
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              value={mintAmount}
+              onChange={(e) => setMintAmount(e.target.value)}
+              className="flex-1"
+            />
+            <span className="text-xs text-muted-foreground">USDC</span>
+            <Button onClick={() => void handleMintToMe()} disabled={minting || !connected}>
+              {minting ? "minting…" : "mint →"}
             </Button>
           </div>
-        </div>
-      </Card>
+          {!connected && (
+            <div className="text-[11px] text-muted-foreground mt-2">connect Freighter first</div>
+          )}
+          {mintMsg && <div className="text-xs mt-2 text-muted-foreground">{mintMsg}</div>}
+        </Card>
+
+        {/* Fund orchestrator */}
+        <Card className="border-[hsl(var(--warning)/0.4)]">
+          <div className="mb-3">
+            <div className="text-sm font-semibold">2. Fund Calypso Orchestrator</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Conscious UX action: give Calypso working capital so it can distribute USDC to bot
+              wallets when you launch sessions. In production this is an x402 payment; on testnet
+              it&apos;s an admin mint to the orchestrator smart account.
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              value={fundAmount}
+              onChange={(e) => setFundAmount(e.target.value)}
+              className="flex-1"
+            />
+            <span className="text-xs text-muted-foreground">USDC</span>
+            <Button onClick={() => void handleFundCalypso()} disabled={funding}>
+              {funding ? "funding…" : "fund →"}
+            </Button>
+          </div>
+          {fundMsg && <div className="text-xs mt-2 text-muted-foreground">{fundMsg}</div>}
+        </Card>
+      </div>
 
       {sessions.length === 0 && !error && (
-        <Card className="mt-4">
+        <Card className="mt-6">
           <div className="text-sm text-muted-foreground">
             No sessions yet — just your wallet and the orchestrator above.{" "}
             <Link href="/simulate" className="text-primary hover:underline">
@@ -151,17 +216,17 @@ export default function WalletsPage() {
         <LegendCard
           tone="primary"
           label="USER"
-          desc="Your Freighter wallet. Funds Calypso with USDC via x402. Receives nothing back — this is pure simulation access."
+          desc="Your Freighter wallet. Gets test XLM from friendbot and test USDC via the mint button above. Funds Calypso by topping up the orchestrator."
         />
         <LegendCard
           tone="warning"
           label="ORCHESTRATOR"
-          desc="Calypso's PAY_TO wallet (friendbot-funded on testnet). Collects x402 fees, creates bot wallets, seeds them with XLM + USDC."
+          desc="Calypso's platform wallet. Holds USDC you funded it with. On session launch, distributes USDC to each bot's smart account based on the session plan."
         />
         <LegendCard
           tone="default"
           label="BOT"
-          desc="Each bot has an EOA keypair + a Hoops smart account. The EOA signs; the smart account holds funds and routes swaps through the Hoops router."
+          desc="Each bot has an EOA keypair + a Hoops smart account. Receives XLM from friendbot and USDC from the orchestrator. Trades through the Hoops router."
         />
       </div>
     </div>
@@ -177,20 +242,12 @@ function LegendCard({
   label: string;
   desc: string;
 }) {
-  const toneClass =
-    tone === "primary"
-      ? "text-primary"
-      : tone === "warning"
-        ? "text-[hsl(var(--warning))]"
-        : "text-muted-foreground";
   return (
     <Card>
       <div className="flex items-center gap-2 mb-2">
         <Badge tone={tone === "default" ? "default" : tone}>{label}</Badge>
       </div>
-      <p className={`text-xs leading-relaxed ${toneClass === "text-muted-foreground" ? "text-muted-foreground" : "text-muted-foreground"}`}>
-        {desc}
-      </p>
+      <p className="text-xs leading-relaxed text-muted-foreground">{desc}</p>
     </Card>
   );
 }

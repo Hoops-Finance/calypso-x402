@@ -58,14 +58,36 @@ export const walletApi = {
     if (!res.ok) throw new Error(`session wallets ${res.status}`);
     return (await res.json()) as SessionWalletsResponse;
   },
-  reseed: async (): Promise<{ ok: true; balances: RawBalances } | { ok: false; error: string }> => {
-    const res = await fetch(`${API_BASE}/wallets/platform/reseed`, { method: "POST" });
+  topUp: async (
+    usdcAmount: number,
+  ): Promise<{ ok: true; balances: RawBalances } | { ok: false; error: string }> => {
+    const res = await fetch(`${API_BASE}/wallets/platform/topup`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ usdc_amount: usdcAmount }),
+    });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       return { ok: false, error: `${res.status}: ${body.slice(0, 200)}` };
     }
     const data = (await res.json()) as { balances: RawBalances };
     return { ok: true, balances: data.balances };
+  },
+  mintUsdcToAddress: async (
+    address: string,
+    usdcAmount: number,
+  ): Promise<{ ok: true; tx: string } | { ok: false; error: string }> => {
+    const res = await fetch(`${API_BASE}/admin/mint-usdc`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ address, usdc_amount: usdcAmount }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, error: `${res.status}: ${body.slice(0, 200)}` };
+    }
+    const data = (await res.json()) as { tx: string };
+    return { ok: true, tx: data.tx };
   },
 };
 

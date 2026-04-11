@@ -234,6 +234,25 @@ export default function SimulatePage() {
                   }}
                 />
               </label>
+              <label className="block">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                  usdc_per_bot
+                </div>
+                <Input
+                  type="number"
+                  step="any"
+                  value={sessionConfig.usdc_per_bot}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    if (Number.isFinite(n) && n > 0) {
+                      updateSessionConfig("usdc_per_bot", n);
+                    }
+                  }}
+                />
+                <div className="mt-1 text-[10px] text-muted-foreground">
+                  USDC the orchestrator sends to each bot on launch (LP needs ≥ 0.5)
+                </div>
+              </label>
               <label className="block sm:col-span-2">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
                   target_pools

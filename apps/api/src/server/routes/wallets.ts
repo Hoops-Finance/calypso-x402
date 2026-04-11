@@ -79,14 +79,25 @@ export async function handleWalletByAddress(req: Request, res: Response): Promis
   res.json({ address, balances });
 }
 
-export async function handlePlatformReseed(_req: Request, res: Response): Promise<void> {
+/**
+ * "Fund Calypso" — the conscious UX action where the user tops up the
+ * orchestrator's USDC balance. On testnet this is a direct admin mint
+ * to the orchestrator's smart account. In production it would be a
+ * real x402 USDC payment from the user's Freighter wallet.
+ */
+export async function handlePlatformTopUp(req: Request, res: Response): Promise<void> {
   if (!ENV.X402_DEMO_MODE) {
-    res.status(403).json({ error: "reseed only available in demo mode" });
+    res.status(403).json({ error: "topup only available in demo mode" });
+    return;
+  }
+  const amount = Number(req.body?.usdc_amount ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 10_000) {
+    res.status(400).json({ error: "usdc_amount must be > 0 and <= 10000" });
     return;
   }
   try {
     const platform = PlatformWallet.get();
-    await platform.reseed();
+    const mintHash = await platform.topUpUsdc(amount);
     const addr = ENV.PAY_TO;
     const smartAccountId = platform.state.smartAccountId;
     const [eoa, smart] = await Promise.all([
@@ -95,6 +106,8 @@ export async function handlePlatformReseed(_req: Request, res: Response): Promis
     ]);
     res.json({
       ok: true,
+      mint_tx: mintHash,
+      amount_usdc: amount,
       smart_account: smartAccountId,
       balances: {
         xlm: (BigInt(eoa.xlm) + BigInt(smart.xlm)).toString(),
@@ -102,10 +115,46 @@ export async function handlePlatformReseed(_req: Request, res: Response): Promis
       },
     });
   } catch (err) {
-    logger.error({ err }, "platformReseed failed");
+    logger.error({ err }, "platformTopUp failed");
     res
       .status(500)
-      .json({ error: "reseed failed", detail: err instanceof Error ? err.message : String(err) });
+      .json({ error: "topup failed", detail: err instanceof Error ? err.message : String(err) });
+  }
+}
+
+/**
+ * Demo-only faucet: mint test USDC directly to any Stellar address.
+ * Used by the /wallets page to give the user's Freighter wallet a
+ * pile of test USDC so they can simulate funding the orchestrator.
+ */
+export async function handleMintUsdcToAddress(req: Request, res: Response): Promise<void> {
+  if (!ENV.X402_DEMO_MODE) {
+    res.status(403).json({ error: "mint faucet only available in demo mode" });
+    return;
+  }
+  const address = String(req.body?.address ?? "").trim();
+  const amount = Number(req.body?.usdc_amount ?? 0);
+  if (!/^[GC][A-Z0-9]{55}$/.test(address)) {
+    res.status(400).json({ error: "invalid stellar address" });
+    return;
+  }
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 10_000) {
+    res.status(400).json({ error: "usdc_amount must be > 0 and <= 10000" });
+    return;
+  }
+  try {
+    const { mintUsdcTo, canMintUsdc } = await import("../../orchestrator/usdcAdmin.js");
+    if (!canMintUsdc()) {
+      res.status(500).json({ error: "USDC_ADMIN_SECRET not configured" });
+      return;
+    }
+    const hash = await mintUsdcTo(address, amount);
+    res.json({ ok: true, tx: hash, amount_usdc: amount, recipient: address });
+  } catch (err) {
+    logger.error({ err }, "mintUsdcToAddress failed");
+    res
+      .status(500)
+      .json({ error: "mint failed", detail: err instanceof Error ? err.message : String(err) });
   }
 }
 
