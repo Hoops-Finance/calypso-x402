@@ -89,6 +89,22 @@ export const walletApi = {
     const data = (await res.json()) as { tx: string };
     return { ok: true, tx: data.tx };
   },
+  withdraw: async (
+    toAddress: string,
+    usdcAmount: number,
+  ): Promise<{ ok: true; tx: string } | { ok: false; error: string }> => {
+    const res = await fetch(`${API_BASE}/wallets/platform/withdraw`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ to: toAddress, usdc_amount: usdcAmount }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, error: `${res.status}: ${body.slice(0, 200)}` };
+    }
+    const data = (await res.json()) as { tx: string };
+    return { ok: true, tx: data.tx };
+  },
 };
 
 /**

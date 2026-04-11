@@ -1,34 +1,45 @@
 @import "tailwindcss";
 
-/* ----------------------------------------------------------------------
-   Calypso Swarm — theme tokens
-   Adapted from the Hoops dashboard-ui design system:
-   yellow #F7D423 primary on near-black #0A0A0A surfaces. Dark-only for
-   the hackathon — no light-mode variants.
-   ---------------------------------------------------------------------- */
+/* ============================================================================
+   CALYPSO SWARM — "Protocol × Ledger" theme
+
+   Industrial trading terminal meets old paper trading ledger. Yellow
+   primary on near-black, editorial serif headlines, mono-first data
+   with a protocol-documentation feel. Dark-only.
+   ============================================================================ */
 
 :root {
-  /* core surface scale (HSL triplets, used via hsl(var(--xxx))) */
-  --background:        20 14.3% 4.1%;
+  /* ----- surfaces ----- */
+  --background:        20 14.3% 3.5%;
+  --ink:               24 10% 2%;            /* deeper than background, for chrome */
   --foreground:        60 9.1% 97.8%;
-  --card:              20 14% 6%;
+  --card:              20 14% 6.2%;
   --card-foreground:   60 9.1% 97.8%;
-  --muted:             12 6.5% 15.1%;
-  --muted-foreground:  24 5.4% 63.9%;
+  --muted:             12 6.5% 13%;
+  --muted-foreground:  24 5.4% 60%;
   --border:            12 6.5% 18%;
-  --input:             12 6.5% 15.1%;
+  --border-strong:     12 6.5% 28%;
+  --input:             12 6.5% 13%;
 
-  /* brand */
-  --primary:           47.9 95.8% 53.1%;   /* hoops yellow */
-  --primary-foreground:26 83.3% 14.1%;
+  /* ----- brand ----- */
+  --primary:           47.9 95.8% 53.1%;     /* Hoops yellow #F7D423 */
+  --primary-ink:       48 95% 58%;           /* slightly lighter for gradients */
+  --primary-foreground: 26 83.3% 9%;
   --accent:            47.9 95.8% 53.1%;
-  --accent-foreground: 26 83.3% 14.1%;
-  --destructive:       0 72% 51%;
-  --destructive-foreground: 60 9.1% 97.8%;
-  --success:           142 71% 45%;
-  --warning:           43 96% 56%;
+  --accent-foreground: 26 83.3% 9%;
 
-  /* chart colors (recharts) */
+  /* ----- semantic ----- */
+  --destructive:       2 82% 54%;            /* blood red for STOP */
+  --destructive-foreground: 60 9.1% 97.8%;
+  --success:           142 71% 45%;          /* acid green */
+  --warning:           43 96% 56%;
+  --info:              193 85% 62%;          /* cold cyan for x402 cleared */
+
+  /* ----- editorial ----- */
+  --paper:             46 53% 95%;           /* paper cream for display titles */
+  --ink-stamp:         2 82% 48%;            /* red ink for PAID stamp */
+
+  /* ----- chart palette ----- */
   --chart-1: 47 96% 53%;
   --chart-2: 160 60% 45%;
   --chart-3: 197 37% 54%;
@@ -38,33 +49,39 @@
   --radius: 0.5rem;
 }
 
-/* Expose the tokens as tailwind-v4 theme colors so classes like
-   bg-background / text-foreground / border-border just work. */
+/* Tailwind v4 theme bridge — exposes tokens as utility classes. */
 @theme inline {
-  --color-background:           hsl(var(--background));
-  --color-foreground:           hsl(var(--foreground));
-  --color-card:                 hsl(var(--card));
-  --color-card-foreground:      hsl(var(--card-foreground));
-  --color-muted:                hsl(var(--muted));
-  --color-muted-foreground:     hsl(var(--muted-foreground));
-  --color-border:               hsl(var(--border));
-  --color-input:                hsl(var(--input));
-  --color-primary:              hsl(var(--primary));
-  --color-primary-foreground:   hsl(var(--primary-foreground));
-  --color-accent:               hsl(var(--accent));
-  --color-accent-foreground:    hsl(var(--accent-foreground));
-  --color-destructive:          hsl(var(--destructive));
+  --color-background:            hsl(var(--background));
+  --color-ink:                   hsl(var(--ink));
+  --color-foreground:            hsl(var(--foreground));
+  --color-card:                  hsl(var(--card));
+  --color-card-foreground:       hsl(var(--card-foreground));
+  --color-muted:                 hsl(var(--muted));
+  --color-muted-foreground:      hsl(var(--muted-foreground));
+  --color-border:                hsl(var(--border));
+  --color-border-strong:         hsl(var(--border-strong));
+  --color-input:                 hsl(var(--input));
+  --color-primary:               hsl(var(--primary));
+  --color-primary-ink:           hsl(var(--primary-ink));
+  --color-primary-foreground:    hsl(var(--primary-foreground));
+  --color-accent:                hsl(var(--accent));
+  --color-accent-foreground:     hsl(var(--accent-foreground));
+  --color-destructive:           hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-success:              hsl(var(--success));
-  --color-warning:              hsl(var(--warning));
-  --color-chart-1:              hsl(var(--chart-1));
-  --color-chart-2:              hsl(var(--chart-2));
-  --color-chart-3:              hsl(var(--chart-3));
-  --color-chart-4:              hsl(var(--chart-4));
-  --color-chart-5:              hsl(var(--chart-5));
+  --color-success:               hsl(var(--success));
+  --color-warning:               hsl(var(--warning));
+  --color-info:                  hsl(var(--info));
+  --color-paper:                 hsl(var(--paper));
+  --color-ink-stamp:             hsl(var(--ink-stamp));
+  --color-chart-1:               hsl(var(--chart-1));
+  --color-chart-2:               hsl(var(--chart-2));
+  --color-chart-3:               hsl(var(--chart-3));
+  --color-chart-4:               hsl(var(--chart-4));
+  --color-chart-5:               hsl(var(--chart-5));
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans:    var(--font-geist-sans);
+  --font-mono:    var(--font-jetbrains);
+  --font-display: var(--font-fraunces);
 }
 
 * {
@@ -80,40 +97,484 @@ body {
 body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
   min-height: 100vh;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+
+  /* Layered atmosphere: corner light + hazard diagonal + subtle film grain. */
+  background-color: hsl(var(--background));
   background-image:
-    radial-gradient(at 20% 0%, hsla(47.9, 95.8%, 53.1%, 0.06) 0px, transparent 50%),
-    radial-gradient(at 80% 100%, hsla(47.9, 95.8%, 53.1%, 0.04) 0px, transparent 50%);
+    radial-gradient(ellipse 80% 60% at 15% 0%, hsla(47.9, 95.8%, 53.1%, 0.07) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 50% at 85% 100%, hsla(47.9, 95.8%, 53.1%, 0.04) 0%, transparent 55%),
+    radial-gradient(ellipse 100% 40% at 50% 0%, hsla(193, 85%, 62%, 0.02) 0%, transparent 50%);
   background-attachment: fixed;
 }
 
-/* ---- Scrollbar ---- */
+/* ---- Film grain overlay (non-interactive, fixed) ---- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.14;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* ---- Display typography helpers ---- */
+.font-display {
+  font-family: var(--font-fraunces), ui-serif, Georgia, serif;
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 30, "WONK" 0, "opsz" 40;
+  letter-spacing: -0.01em;
+}
+.font-mono {
+  font-family: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
+  font-feature-settings: "calt", "zero", "cv12";
+}
+
+/* ---- Paper cream for editorial headings ---- */
+.text-paper { color: hsl(var(--paper)); }
+.bg-paper   { background: hsl(var(--paper)); }
+
+/* ============================================================================
+   SCROLLBAR
+   ============================================================================ */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: hsl(var(--background)); }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted));
+  background: hsl(var(--border-strong));
   border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--primary) / 0.6); }
 
-/* ---- Glow accent for brand moments ---- */
-.calypso-glow {
-  box-shadow:
-    0 0 0 1px hsl(var(--primary) / 0.4),
-    0 8px 40px -12px hsl(var(--primary) / 0.35);
+/* ============================================================================
+   HAZARD STRIPES — diagonal safety-warning pattern used on state chrome
+   ============================================================================ */
+.hazard-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    hsl(var(--primary)) 0 10px,
+    hsl(var(--ink)) 10px 20px
+  );
+}
+.hazard-stripes-red {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    hsl(var(--destructive)) 0 10px,
+    hsl(var(--ink)) 10px 20px
+  );
+}
+.hazard-stripes-sm {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    hsl(var(--primary) / 0.85) 0 4px,
+    transparent 4px 10px
+  );
 }
 
-/* ---- Blinking live dot ---- */
+/* ============================================================================
+   SCANLINES — faint horizontal lines on data-dense panels
+   ============================================================================ */
+.scanlines {
+  position: relative;
+}
+.scanlines::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 2px,
+    hsl(var(--foreground) / 0.022) 2px 3px
+  );
+  mix-blend-mode: overlay;
+}
+
+/* ============================================================================
+   LIVE DOT — pulsing green indicator for "running" state
+   ============================================================================ */
 .live-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 9999px;
   background: hsl(var(--success));
-  box-shadow: 0 0 12px hsl(var(--success) / 0.8);
-  animation: calypso-pulse 1.6s ease-in-out infinite;
+  box-shadow: 0 0 14px hsl(var(--success) / 0.85), 0 0 2px hsl(var(--success));
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.35; transform: scale(0.8); }
 }
 
-@keyframes calypso-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: 0.45; transform: scale(0.85); }
+/* ============================================================================
+   GLOW — subtle primary aura for hero moments
+   ============================================================================ */
+.calypso-glow {
+  box-shadow:
+    0 0 0 1px hsl(var(--primary) / 0.5),
+    0 10px 50px -12px hsl(var(--primary) / 0.35),
+    inset 0 0 60px hsl(var(--primary) / 0.03);
+}
+
+/* ============================================================================
+   FLOW ARROW — LED dots traveling along a vertical wire
+   Used by FlowDiagram between tiers.
+   ============================================================================ */
+.flow-rail {
+  position: relative;
+  width: 2px;
+  background: linear-gradient(
+    to bottom,
+    hsl(var(--border-strong)),
+    hsl(var(--primary) / 0.35),
+    hsl(var(--border-strong))
+  );
+  overflow: hidden;
+}
+.flow-rail-horizontal {
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(
+    to right,
+    hsl(var(--border-strong)),
+    hsl(var(--primary) / 0.35),
+    hsl(var(--border-strong))
+  );
+}
+.flow-dot {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  margin-left: -2px;
+  border-radius: 9999px;
+  background: hsl(var(--primary));
+  box-shadow:
+    0 0 12px hsl(var(--primary)),
+    0 0 3px hsl(var(--primary));
+  animation: flow-travel 2.8s linear infinite;
+}
+.flow-dot.delay-1 { animation-delay: 0.5s; opacity: 0.7; }
+.flow-dot.delay-2 { animation-delay: 1.0s; opacity: 0.5; }
+.flow-dot.delay-3 { animation-delay: 1.5s; opacity: 0.3; }
+@keyframes flow-travel {
+  0%   { top: -8px;  opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: calc(100% + 8px); opacity: 0; }
+}
+
+/* ============================================================================
+   PAYMENT STAMP — red intaglio "PAID" stamp animation
+   ============================================================================ */
+.stamp-slap {
+  animation: stamp-slap 0.9s cubic-bezier(0.2, 0.9, 0.3, 1.2) forwards;
+  transform-origin: center;
+}
+@keyframes stamp-slap {
+  0%   { transform: scale(4) rotate(-18deg); opacity: 0; filter: blur(6px); }
+  40%  { transform: scale(1.08) rotate(-8deg); opacity: 1; filter: blur(0); }
+  55%  { transform: scale(0.95) rotate(-6deg); }
+  70%  { transform: scale(1.02) rotate(-7deg); }
+  100% { transform: scale(1) rotate(-6deg); opacity: 1; }
+}
+
+.stamp-paid {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1.2rem;
+  border: 3px solid hsl(var(--ink-stamp));
+  color: hsl(var(--ink-stamp));
+  font-family: var(--font-jetbrains), monospace;
+  font-weight: 800;
+  font-size: 1.5rem;
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 1px hsl(var(--ink-stamp) / 0.4);
+  background:
+    repeating-linear-gradient(
+      22deg,
+      transparent 0 3px,
+      hsl(var(--ink-stamp) / 0.08) 3px 4px
+    );
+  box-shadow:
+    inset 0 0 0 1px hsl(var(--ink-stamp) / 0.3),
+    inset 0 0 12px hsl(var(--ink-stamp) / 0.15);
+  filter: contrast(1.1);
+}
+.stamp-paid::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 1px solid hsl(var(--ink-stamp) / 0.35);
+  pointer-events: none;
+}
+
+/* ============================================================================
+   NUMBER TICKER — subtle roll when a number changes
+   ============================================================================ */
+.ticker-pop {
+  animation: ticker-pop 0.6s ease-out;
+}
+@keyframes ticker-pop {
+  0%   { color: hsl(var(--primary)); transform: translateY(-2px); }
+  50%  { color: hsl(var(--primary)); }
+  100% { transform: translateY(0); }
+}
+
+/* ============================================================================
+   MARQUEE — protocol ticker tape across the header
+   ============================================================================ */
+.marquee {
+  display: flex;
+  overflow: hidden;
+  user-select: none;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 6%,
+    black 94%,
+    transparent
+  );
+}
+.marquee__track {
+  display: flex;
+  flex-shrink: 0;
+  white-space: nowrap;
+  will-change: transform;
+  animation: marquee-scroll 48s linear infinite;
+}
+@keyframes marquee-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ============================================================================
+   HTTP METHOD BADGE — color-coded HTTP verb pill for protocol panels
+   ============================================================================ */
+.method-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-family: var(--font-jetbrains), monospace;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  line-height: 1.4;
+  border-radius: 2px;
+}
+.method-POST { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.method-GET  { background: hsl(var(--info) / 0.2); color: hsl(var(--info)); }
+.method-402  { background: hsl(var(--ink-stamp) / 0.18); color: hsl(var(--ink-stamp)); }
+.method-200  { background: hsl(var(--success) / 0.18); color: hsl(var(--success)); }
+
+/* ============================================================================
+   CORNER MARKS — four tiny L-brackets in card corners (blueprint feel)
+   ============================================================================ */
+.corner-marks {
+  position: relative;
+}
+.corner-marks::before,
+.corner-marks::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: hsl(var(--primary) / 0.7);
+  pointer-events: none;
+}
+.corner-marks::before {
+  top: 6px;
+  left: 6px;
+  border-top: 1.5px solid;
+  border-left: 1.5px solid;
+}
+.corner-marks::after {
+  bottom: 6px;
+  right: 6px;
+  border-bottom: 1.5px solid;
+  border-right: 1.5px solid;
+}
+
+/* ============================================================================
+   BIG STATE BADGE — session lifecycle indicator
+   ============================================================================ */
+.state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 1rem 0.4rem 0.7rem;
+  font-family: var(--font-jetbrains), monospace;
+  font-weight: 800;
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  border: 1px solid;
+  position: relative;
+}
+.state-running {
+  background: hsl(var(--success) / 0.1);
+  border-color: hsl(var(--success) / 0.5);
+  color: hsl(var(--success));
+}
+.state-planning {
+  background: hsl(var(--muted));
+  border-color: hsl(var(--border-strong));
+  color: hsl(var(--muted-foreground));
+}
+.state-completed {
+  background: hsl(var(--info) / 0.1);
+  border-color: hsl(var(--info) / 0.5);
+  color: hsl(var(--info));
+}
+.state-failed {
+  background: hsl(var(--destructive) / 0.1);
+  border-color: hsl(var(--destructive) / 0.5);
+  color: hsl(var(--destructive));
+}
+.state-stopping {
+  background: hsl(var(--warning) / 0.1);
+  border-color: hsl(var(--warning) / 0.5);
+  color: hsl(var(--warning));
+  animation: pulse-warn 1.4s ease-in-out infinite;
+}
+@keyframes pulse-warn {
+  0%, 100% { box-shadow: inset 0 0 0 0 hsl(var(--warning) / 0.2); }
+  50%      { box-shadow: inset 0 0 20px 0 hsl(var(--warning) / 0.25); }
+}
+
+/* ============================================================================
+   FLASH — brief color flash on an element (fund arrival indicator)
+   ============================================================================ */
+.flash-yellow { animation: flash-yellow 1s ease-out; }
+@keyframes flash-yellow {
+  0%   { background-color: hsl(var(--primary) / 0.35); }
+  100% { background-color: transparent; }
+}
+
+/* ============================================================================
+   SLOT ROLL — slot-machine-style digit roll on changed numbers
+   ============================================================================ */
+.slot-roll {
+  display: inline-block;
+  animation: slot-roll 0.45s cubic-bezier(0.33, 0.9, 0.4, 1);
+}
+@keyframes slot-roll {
+  0%   { transform: translateY(-50%); opacity: 0; }
+  100% { transform: translateY(0);    opacity: 1; }
+}
+
+/* ============================================================================
+   SHIP MARK — diagonal stenciled label like a shipping crate
+   ============================================================================ */
+.ship-mark {
+  font-family: var(--font-jetbrains), monospace;
+  font-weight: 900;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  color: hsl(var(--primary) / 0.55);
+  border-top: 1px solid hsl(var(--primary) / 0.4);
+  border-bottom: 1px solid hsl(var(--primary) / 0.4);
+  padding: 2px 8px;
+  display: inline-block;
+}
+
+/* ============================================================================
+   MODAL BACKDROP — for X402 ceremony and confirmation dialogs
+   ============================================================================ */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: hsl(var(--ink) / 0.85);
+  backdrop-filter: blur(8px);
+  animation: fade-in 0.25s ease-out;
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.modal-enter {
+  animation: modal-enter 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+@keyframes modal-enter {
+  from { transform: translateY(20px) scale(0.97); opacity: 0; }
+  to   { transform: translateY(0)    scale(1);    opacity: 1; }
+}
+
+/* ============================================================================
+   GLITCH — subtle text jitter for the "paying..." moment
+   ============================================================================ */
+.glitch {
+  position: relative;
+  display: inline-block;
+}
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.glitch::before {
+  color: hsl(var(--primary) / 0.7);
+  animation: glitch-x 2s infinite steps(1);
+  mix-blend-mode: screen;
+}
+.glitch::after {
+  color: hsl(var(--info) / 0.6);
+  animation: glitch-x 2s infinite steps(1) reverse;
+  mix-blend-mode: screen;
+}
+@keyframes glitch-x {
+  0%, 100% { transform: translate(0); }
+  15%      { transform: translate(1.5px, 0); }
+  30%      { transform: translate(-1.5px, 0); }
+  45%      { transform: translate(0); }
+}
+
+/* ============================================================================
+   HTTP BLOCK — decoded protocol response rendered as a pre block
+   ============================================================================ */
+.http-block {
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  background:
+    linear-gradient(hsl(var(--ink)), hsl(var(--ink))),
+    repeating-linear-gradient(
+      to bottom,
+      hsl(var(--foreground) / 0) 0 22px,
+      hsl(var(--foreground) / 0.015) 22px 44px
+    );
+  border: 1px solid hsl(var(--border-strong));
+  border-left: 3px solid hsl(var(--primary));
+  padding: 1rem 1.25rem;
+  color: hsl(var(--foreground) / 0.9);
+  white-space: pre-wrap;
+  word-break: break-all;
+  position: relative;
+}
+.http-block .key   { color: hsl(var(--primary)); }
+.http-block .str   { color: hsl(var(--info)); }
+.http-block .num   { color: hsl(var(--success)); }
+.http-block .comment { color: hsl(var(--muted-foreground)); font-style: italic; }
+
+/* ============================================================================
+   FOCUS STATES
+   ============================================================================ */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
 }
