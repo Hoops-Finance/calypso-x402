@@ -1,0 +1,19 @@
+{
+  "name": "calypso-swarm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-orchestrated Stellar DeFi market simulation — paid via x402 USDC micropayments.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.8.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "bootstrap-pay-to": "pnpm --filter @calypso/api run bootstrap-pay-to",
+    "dev:api": "pnpm --filter @calypso/api run dev",
+    "dev:web": "pnpm --filter @calypso/web run dev",
+    "build": "pnpm -r run build",
+    "smoke:swap": "pnpm --filter @calypso/api run smoke:swap",
+    "smoke:session": "pnpm --filter @calypso/api run smoke:session"
+  }
+}
