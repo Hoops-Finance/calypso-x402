@@ -39,7 +39,12 @@ async function bootstrap(): Promise<void> {
   // a hostile client can't burn our Gemma quota even if they bypass payment.
   const planRateLimit = rateLimit({ windowMs: 60_000, max: 10, label: "plan" });
   const simulateRateLimit = rateLimit({ windowMs: 60_000, max: 5, label: "simulate" });
-  app.use(buildX402Middleware());
+
+  if (ENV.X402_DEMO_MODE) {
+    logger.warn("X402_DEMO_MODE=true — gated routes are OPEN. Do not deploy.");
+  } else {
+    app.use(buildX402Middleware());
+  }
   app.post("/plan", planRateLimit, handlePlan);
   app.post("/simulate", simulateRateLimit, handleSimulate);
   app.post("/analyze", handleAnalyze);

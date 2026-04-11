@@ -31,4 +31,9 @@ export const ENV = {
   AI_INTERVAL_MS: Number(optional("AI_INTERVAL_MS", "300000")),
 
   HOOPS_DATA_API_URL: process.env.HOOPS_DATA_API_URL ?? "",
+
+  // When true, gated routes skip x402 verification entirely. Intended for
+  // local UI demos where driving real browser-side payment signing is
+  // out of scope. Default off. DO NOT set this in a deployment.
+  X402_DEMO_MODE: (process.env.X402_DEMO_MODE ?? "").toLowerCase() === "true",
 } as const;
