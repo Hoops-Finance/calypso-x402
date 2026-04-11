@@ -18,6 +18,12 @@
 import { Keypair } from "@stellar/stellar-sdk";
 import { createBotSession, type BotSession } from "../router/hoopsRouter.js";
 import { FRIENDBOT_URL, BOT_DEPLOY_XLM_FUNDING } from "../constants.js";
+import { logger } from "../logger.js";
+
+// How much XLM to immediately swap to USDC so the bot's smart account
+// holds both sides of the book. LP bots need this to deposit 50/50
+// liquidity; arb/noise bots benefit from having both directions.
+const BOT_USDC_SEED_XLM = 20;
 
 export interface TreasuryWallet {
   keypair: Keypair;
@@ -54,6 +60,21 @@ export async function createBotWallet(botId: string): Promise<BotWallet> {
   await friendbotFund(kp.publicKey());
   const session = await createBotSession(kp);
   await session.session.fundAccountXlm(BOT_DEPLOY_XLM_FUNDING);
+
+  // Seed the smart account with some USDC so bots that need both sides of
+  // the book (LP manager, arb in both directions) can actually trade. A
+  // failed seed isn't fatal — noise bots still work XLM-only — so we log
+  // and continue.
+  try {
+    const txHash = await session.session.swapXlmToUsdc(BOT_USDC_SEED_XLM);
+    logger.info({ botId, txHash }, "wallets: seeded USDC via XLM swap");
+  } catch (err) {
+    logger.warn(
+      { botId, err: err instanceof Error ? err.message : err },
+      "wallets: USDC seed swap failed — bot will continue with XLM only",
+    );
+  }
+
   return { ...session, botId };
 }
 

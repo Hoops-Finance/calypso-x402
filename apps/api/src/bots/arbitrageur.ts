@@ -39,6 +39,12 @@ interface Spread {
   worstAmountOut: bigint;
 }
 
+// On testnet, some adapters return stale/absurd quotes (Comet pools with
+// ancient reserves, for example). Cap the displayed spread so the UI log
+// never shows scientific notation. A spread > 10_000bps (>100%) just tells
+// us "mispriced pool", the exact number isn't useful.
+const MAX_DISPLAY_BPS = 10_000;
+
 function computeSpread(
   quotes: { adapterId: number; amountOut: bigint }[],
 ): Spread | null {
@@ -50,9 +56,10 @@ function computeSpread(
     if (q.amountOut < worst.amountOut) worst = q;
   }
   if (worst.amountOut === 0n) return null;
-  // (best - worst) / worst, in basis points.
+  // (best - worst) / worst, in basis points, capped for display.
   const diffScaled = (best.amountOut - worst.amountOut) * 10_000n;
-  const bps = Number(diffScaled / worst.amountOut);
+  const rawBps = Number(diffScaled / worst.amountOut);
+  const bps = Number.isFinite(rawBps) && rawBps < MAX_DISPLAY_BPS ? rawBps : MAX_DISPLAY_BPS;
   return {
     bps,
     bestAdapterId: best.adapterId,
@@ -79,10 +86,12 @@ export const arbitrageurTick: TickFn = async ({ bot, config, log }) => {
     return;
   }
 
+  const spreadLabel = spread.bps >= MAX_DISPLAY_BPS ? `>${MAX_DISPLAY_BPS}` : String(spread.bps);
+
   if (spread.bps < config.min_spread_bps) {
     log({
       action: "skip",
-      note: `spread ${spread.bps}bps < threshold ${config.min_spread_bps}bps (best adapter ${ADAPTER_NAME_BY_ID[spread.bestAdapterId] ?? spread.bestAdapterId})`,
+      note: `spread ${spreadLabel}bps < threshold ${config.min_spread_bps}bps (best adapter ${ADAPTER_NAME_BY_ID[spread.bestAdapterId] ?? spread.bestAdapterId})`,
     });
     return;
   }
@@ -95,6 +104,6 @@ export const arbitrageurTick: TickFn = async ({ bot, config, log }) => {
     amount_in: probeAmount,
     amount_out: Number(fromStroops(result.expectedAmountOut)),
     tx_hash: result.txHash,
-    note: `arb fire: spread=${spread.bps}bps, best=${ADAPTER_NAME_BY_ID[spread.bestAdapterId]} (executed via soroswap)`,
+    note: `arb fire: spread=${spreadLabel}bps, best=${ADAPTER_NAME_BY_ID[spread.bestAdapterId]} (executed via soroswap)`,
   });
 };

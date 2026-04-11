@@ -26,10 +26,23 @@ export const lpTick: TickFn = async ({ bot, config, log }) => {
   const hasPosition = positions.some((p) => p.shares > 0n);
 
   if (!hasPosition) {
+    // Defensive: addLiquidity50_50 requires USDC in the smart account.
+    // The wallet factory seeds some via an initial XLM→USDC swap, but
+    // that can fail silently. Skip gracefully instead of error-looping.
+    const balances = await bot.session.getBalances();
+    const usdcHuman = Number(balances.usdc) / 10_000_000;
+    const MIN_USDC_FOR_DEPOSIT = 0.5;
+    if (usdcHuman < MIN_USDC_FOR_DEPOSIT) {
+      log({
+        action: "skip",
+        note: `lp waiting on USDC seed: ${usdcHuman.toFixed(2)} available, need >= ${MIN_USDC_FOR_DEPOSIT}`,
+      });
+      return;
+    }
     await bot.session.deposit();
     log({
       action: "deposit_liquidity",
-      note: `initial 50/50 deposit of ${config.deposit_amount} to ${config.target_pool}`,
+      note: `initial 50/50 deposit (${usdcHuman.toFixed(2)} USDC available) to ${config.target_pool}`,
     });
     return;
   }
