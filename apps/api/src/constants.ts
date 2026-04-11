@@ -31,4 +31,10 @@ export const TOKENS = ADDRESS_BOOK.tokens;
 export const POOLS = ADDRESS_BOOK.pools;
 
 export const MIN_BOT_XLM_FUNDING = 500;   // friendbot gives 10,000 — keep some for fees
-export const BOT_DEPLOY_XLM_FUNDING = 100; // xlm routed to the smart account post-deploy
+// XLM routed to the smart account post-deploy. Big enough that the
+// bot's self-swap can pull a real chunk for USDC seeding.
+export const BOT_DEPLOY_XLM_FUNDING = 9_000;
+// XLM amount each bot swaps to USDC immediately after deploy. On the
+// Hoops testnet Soroswap pool this converts to ~0.55 USDC, enough to
+// clear the 0.5 LP deposit threshold.
+export const BOT_SELF_SEED_SWAP_XLM = 4_000;

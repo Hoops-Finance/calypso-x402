@@ -16,18 +16,13 @@
  */
 
 import { Keypair } from "@stellar/stellar-sdk";
-import { toStroops } from "hoops-sdk-core";
 import { createBotSession, type BotSession } from "../router/hoopsRouter.js";
-import { FRIENDBOT_URL, BOT_DEPLOY_XLM_FUNDING } from "../constants.js";
-import { PlatformWallet } from "./platformWallet.js";
+import {
+  FRIENDBOT_URL,
+  BOT_DEPLOY_XLM_FUNDING,
+  BOT_SELF_SEED_SWAP_XLM,
+} from "../constants.js";
 import { logger } from "../logger.js";
-
-// How much USDC the orchestrator transfers into each new bot's smart
-// account. Set right above the 0.5 USDC LP deposit threshold (per
-// hoops-sdk TX_DEFAULTS.minUsdcForDeposit) since orchestrator USDC is
-// a scarce resource on testnet (every 1 USDC costs us ~7000 XLM of
-// friendbot funds via the Hoops Soroswap pool).
-const BOT_USDC_SEED_USDC = 0.55;
 
 export interface TreasuryWallet {
   keypair: Keypair;
@@ -63,30 +58,34 @@ export async function createBotWallet(botId: string): Promise<BotWallet> {
   const kp = Keypair.random();
   await friendbotFund(kp.publicKey());
   const session = await createBotSession(kp);
+
+  // Step 1: fund the smart account with a big chunk of XLM (9000). This
+  // is a single EOA→smart-account SAC transfer. It works the first time
+  // and only the first time — the XLM SAC's EOA-side balance collapses
+  // after one transfer. Which is fine: each bot is a fresh keypair with
+  // a fresh SAC balance, and we only need ONE fund call per bot.
   await session.session.fundAccountXlm(BOT_DEPLOY_XLM_FUNDING);
 
-  // Orchestrator-funded USDC seed. The platform wallet holds USDC that
-  // it accumulated on startup via a large XLM→USDC seed swap. We pull
-  // from it to fund this bot's smart account directly, so the bot never
-  // has to figure out its own USDC acquisition. This matches the "user
-  // → orchestrator → bots" mental model we show in the UI.
+  // Step 2: self-seed USDC by swapping a large chunk (4000 XLM) for USDC
+  // inside the smart account. On the Hoops testnet Soroswap pool this
+  // yields ~0.55 USDC, which is enough for the LP bot's 0.5 USDC
+  // deposit threshold. Each bot does this independently — no platform
+  // dependency, no keypair race conditions.
   //
-  // If the orchestrator is out of USDC (e.g. long-running server that
-  // burnt through its float) we log and continue — the bot will still
-  // work for archetypes that only need XLM. The LP bot will skip its
-  // deposit with a clean log.
+  // The platform wallet still exists as the x402 revenue collector and
+  // is visible in the UI as "where your payments go". It does NOT fund
+  // bot USDC on testnet; that would require wrapping/unwrapping XLM
+  // across the SAC, which is cursed.
   try {
-    const platform = PlatformWallet.get();
-    const amountStroops = toStroops(BOT_USDC_SEED_USDC);
-    const txHash = await platform.transferUsdc(session.smartAccountId, amountStroops);
+    const txHash = await session.session.swapXlmToUsdc(BOT_SELF_SEED_SWAP_XLM);
     logger.info(
-      { botId, txHash, usdc: BOT_USDC_SEED_USDC },
-      "wallets: funded bot USDC from orchestrator",
+      { botId, txHash, xlm: BOT_SELF_SEED_SWAP_XLM },
+      "wallets: bot self-seeded USDC via XLM swap",
     );
   } catch (err) {
     logger.warn(
       { botId, err: err instanceof Error ? err.message : err },
-      "wallets: orchestrator USDC funding failed — bot will operate XLM-only",
+      "wallets: bot self-seed swap failed — bot will operate XLM-only",
     );
   }
 

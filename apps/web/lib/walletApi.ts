@@ -58,6 +58,15 @@ export const walletApi = {
     if (!res.ok) throw new Error(`session wallets ${res.status}`);
     return (await res.json()) as SessionWalletsResponse;
   },
+  reseed: async (): Promise<{ ok: true; balances: RawBalances } | { ok: false; error: string }> => {
+    const res = await fetch(`${API_BASE}/wallets/platform/reseed`, { method: "POST" });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, error: `${res.status}: ${body.slice(0, 200)}` };
+    }
+    const data = (await res.json()) as { balances: RawBalances };
+    return { ok: true, balances: data.balances };
+  },
 };
 
 /**

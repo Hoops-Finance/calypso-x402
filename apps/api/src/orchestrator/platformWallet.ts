@@ -98,6 +98,11 @@ export class PlatformWallet {
   private readonly usdcToken: TokenContract;
   private initialized = false;
   private initializing: Promise<void> | null = null;
+  // Serializes outgoing token transfers so concurrent callers don't race
+  // on the platform keypair's sequence number. Each new transferUsdc()
+  // chains onto this promise and updates it. Swallows errors in the
+  // chain so one failed transfer doesn't poison subsequent ones.
+  private txQueue: Promise<unknown> = Promise.resolve();
 
   private constructor(keypair: Keypair) {
     this.keypair = keypair;
@@ -150,32 +155,12 @@ export class PlatformWallet {
   }
 
   private async boot(): Promise<void> {
-    // 1. friendbot — idempotent. Only call if we don't already have a
-    // persisted smart account, since a re-friendbot of an already-
-    // funded account is a no-op anyway.
     const persistedSmartAccountId = process.env.PLATFORM_SMART_ACCOUNT_ID;
-    if (!persistedSmartAccountId) {
-      try {
-        const res = await fetch(`${FRIENDBOT_URL}?addr=${encodeURIComponent(this.eoa)}`);
-        if (res.ok) {
-          logger.info({ eoa: this.eoa }, "platformWallet: friendbot funded");
-        } else {
-          const body = await res.text().catch(() => "");
-          if (res.status === 400 && /already/i.test(body)) {
-            logger.info({ eoa: this.eoa }, "platformWallet: already funded");
-          } else {
-            logger.warn({ status: res.status, body }, "platformWallet: friendbot non-ok");
-          }
-        }
-      } catch (err) {
-        logger.warn({ err }, "platformWallet: friendbot threw");
-      }
-    }
 
-    // 2. Session + smart account. Reuse the persisted ID if we have
-    // one, otherwise deploy a new one and write it back to .env so
-    // subsequent boots (inc. tsx watcher reloads) don't burn another
-    // 9500 XLM on a throwaway deploy.
+    // FAST PATH — we already have a persisted smart account from a
+    // prior boot. Trust it and use whatever USDC it currently holds.
+    // If USDC runs low in the middle of a session, the operator can
+    // hit POST /wallets/reseed to top up (see reseed()).
     if (persistedSmartAccountId) {
       this.session = createSession({
         network: HOOPS_NETWORK,
@@ -183,38 +168,60 @@ export class PlatformWallet {
         smartAccountId: persistedSmartAccountId,
       });
       this.smartAccountId = persistedSmartAccountId;
-      logger.info({ smart: this.smartAccountId }, "platformWallet: reusing persisted smart account");
-    } else {
-      this.session = createSession({ network: HOOPS_NETWORK, keypair: this.keypair });
-      try {
-        this.smartAccountId = await this.session.deploySmartAccount();
-        upsertEnv(ROOT_ENV, { PLATFORM_SMART_ACCOUNT_ID: this.smartAccountId });
-        logger.info(
-          { smart: this.smartAccountId },
-          "platformWallet: deployed + persisted smart account",
-        );
-      } catch (err) {
-        logger.warn({ err }, "platformWallet: deploySmartAccount failed (continuing)");
-        this.smartAccountId = this.session.state.smartAccountId;
+      const currentSmartUsdc = await this.usdcToken.balance(this.eoa, this.smartAccountId);
+      logger.info(
+        { smart: this.smartAccountId, smart_usdc: currentSmartUsdc.toString() },
+        "platformWallet: reusing persisted smart account (fast path)",
+      );
+      return;
+    }
+
+    // SLOW PATH — first-ever boot. Full seed sequence.
+    try {
+      const res = await fetch(`${FRIENDBOT_URL}?addr=${encodeURIComponent(this.eoa)}`);
+      if (res.ok) {
+        logger.info({ eoa: this.eoa }, "platformWallet: friendbot funded");
+      } else {
+        const body = await res.text().catch(() => "");
+        if (res.status === 400 && /already/i.test(body)) {
+          logger.info({ eoa: this.eoa }, "platformWallet: already funded");
+        } else {
+          logger.warn({ status: res.status, body }, "platformWallet: friendbot non-ok");
+        }
       }
+    } catch (err) {
+      logger.warn({ err }, "platformWallet: friendbot threw");
+    }
+
+    this.session = createSession({ network: HOOPS_NETWORK, keypair: this.keypair });
+    try {
+      this.smartAccountId = await this.session.deploySmartAccount();
+      upsertEnv(ROOT_ENV, { PLATFORM_SMART_ACCOUNT_ID: this.smartAccountId });
+      logger.info(
+        { smart: this.smartAccountId },
+        "platformWallet: deployed + persisted smart account",
+      );
+    } catch (err) {
+      logger.error({ err }, "platformWallet: deploySmartAccount failed");
+      throw new Error("platformWallet: deploy failed on first boot");
     }
 
     if (!this.smartAccountId) {
       throw new Error("platformWallet: no smart account after boot");
     }
 
-    // 3. If the smart account already holds enough USDC to seed bots,
-    // skip the fund + swap entirely. This is the hot path on reloads.
-    const currentSmartUsdc = await this.usdcToken.balance(this.eoa, this.smartAccountId);
-    if (currentSmartUsdc >= SEED_SUFFICIENT_USDC_STROOPS) {
-      logger.info(
-        { smart_usdc: currentSmartUsdc.toString() },
-        "platformWallet: already seeded, skipping XLM funding + swap",
-      );
-      return;
-    }
+    await this.fundAndSwap();
+  }
 
-    // 4. fund smart account with XLM
+  /**
+   * Runs the core fund-XLM-then-swap-to-USDC cycle. Called from boot
+   * on first run, and callable externally via reseed() when USDC runs
+   * low. Does NOT mutate any persistence state.
+   */
+  private async fundAndSwap(): Promise<void> {
+    if (!this.session || !this.smartAccountId) {
+      throw new Error("platformWallet: fundAndSwap called before session ready");
+    }
     try {
       await this.session.fundAccountXlm(SMART_ACCOUNT_XLM_FUNDING);
       logger.info(
@@ -225,9 +232,6 @@ export class PlatformWallet {
       logger.warn({ err }, "platformWallet: fundAccountXlm failed");
     }
 
-    // 5. seed swap — XLM → USDC. Hoops' smart-account swap path
-    // actually delivers USDC to the smart account (verified after a
-    // prior diagnostic scare).
     try {
       const txHash = await this.session.swapXlmToUsdc(SEED_SWAP_XLM_AMOUNT);
       logger.info({ txHash, xlm: SEED_SWAP_XLM_AMOUNT }, "platformWallet: seed swap landed");
@@ -235,7 +239,6 @@ export class PlatformWallet {
       logger.warn({ err }, "platformWallet: seed swap failed — USDC balance will be 0");
     }
 
-    // 6. final balance log
     const [eoaUsdc, smartUsdc] = await Promise.all([
       this.usdcToken.balance(this.eoa, this.eoa),
       this.usdcToken.balance(this.eoa, this.smartAccountId),
@@ -245,49 +248,107 @@ export class PlatformWallet {
         eoa_usdc: eoaUsdc.toString(),
         smart_usdc: smartUsdc.toString(),
       },
-      "platformWallet: usdc balances after seed",
+      "platformWallet: usdc balances after fund+swap",
     );
+  }
+
+  /**
+   * Manual re-seed: reruns fundAndSwap. Useful when the orchestrator
+   * has drained its USDC distributing to bots and needs to top up.
+   * Intended to be called from POST /wallets/reseed in demo mode.
+   */
+  async reseed(): Promise<void> {
+    await this.ensureInitialized();
+    await this.fundAndSwap();
   }
 
   /**
    * Transfers `amountStroops` USDC from the orchestrator to `recipient`.
    *
-   * Checks the smart account first (where the Hoops swap actually
-   * delivers USDC — the earlier "swap lands on EOA" theory was wrong).
-   * If the smart account has enough, we use SmartAccountContract's
-   * built-in `transfer(token, to, amount)` method, which is how the
-   * smart account releases tokens to arbitrary addresses. Falls back
-   * to the EOA path if for some reason USDC ended up there instead.
+   * Serialized via the internal txQueue so multiple concurrent callers
+   * (e.g. Promise.all over bot creation) don't race on the platform
+   * keypair's sequence number. Each invocation:
+   *   1. Waits for any previously-queued transfer to finish
+   *   2. Reads orchestrator balances fresh
+   *   3. Submits the transfer tx, retrying transient RPC errors
+   *      (TRY_AGAIN_LATER, NOT_FOUND during waitForTx) up to 3 times
    */
   async transferUsdc(recipient: string, amountStroops: bigint): Promise<string> {
     await this.ensureInitialized();
+    const prev = this.txQueue;
+    const mine = (async () => {
+      try {
+        await prev;
+      } catch {
+        /* swallow — one failure shouldn't poison the queue */
+      }
+      return this.doTransferUsdc(recipient, amountStroops);
+    })();
+    this.txQueue = mine;
+    return mine;
+  }
 
+  private async doTransferUsdc(recipient: string, amountStroops: bigint): Promise<string> {
     if (!this.smartAccountId) {
       throw new Error("platformWallet: no smart account");
     }
 
     const smartBalance = await this.usdcToken.balance(this.eoa, this.smartAccountId);
     if (smartBalance >= amountStroops) {
-      const account = new SmartAccountContract(
-        this.smartAccountId,
-        this.rpcServer,
-        NETWORK_PASSPHRASE,
-      );
-      const tx = await account.buildTransferTx(this.eoa, TOKENS.usdc, recipient, amountStroops);
-      const { hash } = await signAndSubmitTx(this.rpcServer, this.keypair, tx);
-      return hash;
+      return this.submitWithRetry(async () => {
+        const account = new SmartAccountContract(
+          this.smartAccountId!,
+          this.rpcServer,
+          NETWORK_PASSPHRASE,
+        );
+        const tx = await account.buildTransferTx(this.eoa, TOKENS.usdc, recipient, amountStroops);
+        const { hash } = await signAndSubmitTx(this.rpcServer, this.keypair, tx);
+        return hash;
+      });
     }
 
     const eoaBalance = await this.usdcToken.balance(this.eoa, this.eoa);
     if (eoaBalance >= amountStroops) {
-      const tx = await this.usdcToken.buildTransferTx(this.eoa, recipient, amountStroops);
-      const { hash } = await signAndSubmitTx(this.rpcServer, this.keypair, tx);
-      return hash;
+      return this.submitWithRetry(async () => {
+        const tx = await this.usdcToken.buildTransferTx(this.eoa, recipient, amountStroops);
+        const { hash } = await signAndSubmitTx(this.rpcServer, this.keypair, tx);
+        return hash;
+      });
     }
 
     throw new Error(
       `platformWallet: insufficient USDC (smart=${smartBalance}, eoa=${eoaBalance}, need=${amountStroops})`,
     );
+  }
+
+  /**
+   * Retries a soroban tx submission on transient failures. Soroban
+   * preview RPC throws TRY_AGAIN_LATER under load and NOT_FOUND when
+   * waitForTx races the indexer. Both are safe to retry after a short
+   * backoff.
+   */
+  private async submitWithRetry<T>(fn: () => Promise<T>): Promise<T> {
+    const MAX_ATTEMPTS = 3;
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastErr = err;
+        const msg = err instanceof Error ? err.message : String(err);
+        const transient = /TRY_AGAIN_LATER|NOT_FOUND|txBadSeq/i.test(msg);
+        if (!transient || attempt === MAX_ATTEMPTS) {
+          throw err;
+        }
+        const backoffMs = 1500 * attempt;
+        logger.warn(
+          { attempt, backoffMs, err: msg.slice(0, 200) },
+          "platformWallet: transient submit error, retrying",
+        );
+        await new Promise((r) => setTimeout(r, backoffMs));
+      }
+    }
+    throw lastErr;
   }
 
   /** For the UI/diagnostics. */

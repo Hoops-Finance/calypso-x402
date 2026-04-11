@@ -79,6 +79,36 @@ export async function handleWalletByAddress(req: Request, res: Response): Promis
   res.json({ address, balances });
 }
 
+export async function handlePlatformReseed(_req: Request, res: Response): Promise<void> {
+  if (!ENV.X402_DEMO_MODE) {
+    res.status(403).json({ error: "reseed only available in demo mode" });
+    return;
+  }
+  try {
+    const platform = PlatformWallet.get();
+    await platform.reseed();
+    const addr = ENV.PAY_TO;
+    const smartAccountId = platform.state.smartAccountId;
+    const [eoa, smart] = await Promise.all([
+      readBalances(addr, addr),
+      smartAccountId ? readBalances(addr, smartAccountId) : Promise.resolve({ xlm: "0", usdc: "0" }),
+    ]);
+    res.json({
+      ok: true,
+      smart_account: smartAccountId,
+      balances: {
+        xlm: (BigInt(eoa.xlm) + BigInt(smart.xlm)).toString(),
+        usdc: (BigInt(eoa.usdc) + BigInt(smart.usdc)).toString(),
+      },
+    });
+  } catch (err) {
+    logger.error({ err }, "platformReseed failed");
+    res
+      .status(500)
+      .json({ error: "reseed failed", detail: err instanceof Error ? err.message : String(err) });
+  }
+}
+
 export async function handleSessionWallets(req: Request, res: Response): Promise<void> {
   const sessionId = req.params.sessionId;
   if (!sessionId) {

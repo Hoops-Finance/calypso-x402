@@ -89,14 +89,14 @@ export function WalletHierarchy({ sessionId, showUser = true, pollMs = 4000 }: P
       <WalletTier
         role="orchestrator"
         label="Calypso Orchestrator"
-        sublabel="PAY_TO · collects x402 fees"
+        sublabel="PAY_TO · platform revenue wallet"
         address={platform?.address ?? null}
         balances={platform?.balances ?? null}
       />
 
       {sessionId && (
         <>
-          <FlowArrow label="spawns ephemeral bot wallets (friendbot + seed swap)" />
+          <FlowArrow label="spawns bot wallets (friendbot XLM + self-seeded USDC swap)" />
           <SessionTier session={sessionWallets} />
         </>
       )}

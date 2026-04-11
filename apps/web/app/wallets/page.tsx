@@ -2,15 +2,32 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Badge, Card } from "../../components/ui";
+import { Badge, Button, Card } from "../../components/ui";
 import { WalletHierarchy } from "../../components/WalletHierarchy";
 import { api } from "../../lib/apiClient";
+import { walletApi } from "../../lib/walletApi";
 import type { SessionSummary } from "@calypso/shared";
 
 export default function WalletsPage() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reseeding, setReseeding] = useState(false);
+  const [reseedMsg, setReseedMsg] = useState<string | null>(null);
+
+  async function handleReseed() {
+    setReseeding(true);
+    setReseedMsg(null);
+    const result = await walletApi.reseed();
+    if (result.ok) {
+      setReseedMsg("topped up ✓");
+      setTimeout(() => setReseedMsg(null), 4000);
+    } else {
+      setReseedMsg(`error: ${result.error}`);
+      setTimeout(() => setReseedMsg(null), 8000);
+    }
+    setReseeding(false);
+  }
 
   useEffect(() => {
     let alive = true;
@@ -95,6 +112,28 @@ export default function WalletsPage() {
       )}
 
       <WalletHierarchy sessionId={selectedSessionId ?? undefined} />
+
+      {/* Orchestrator top-up control */}
+      <Card className="mt-4 border-[hsl(var(--warning)/0.35)]">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold">Top up orchestrator USDC</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Runs another {" "}
+              <code className="text-primary">fundAccountXlm(9500) → swapXlmToUsdc(8500)</code> cycle on
+              the platform wallet. Use when orchestrator USDC runs low from seeding bots.
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {reseedMsg && (
+              <span className="text-xs text-muted-foreground">{reseedMsg}</span>
+            )}
+            <Button onClick={() => void handleReseed()} disabled={reseeding}>
+              {reseeding ? "topping up…" : "top up"}
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {sessions.length === 0 && !error && (
         <Card className="mt-4">
