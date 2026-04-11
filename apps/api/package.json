@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "bootstrap-pay-to": "tsx scripts/bootstrap-pay-to.ts",
     "smoke:swap": "tsx scripts/smoke-swap.ts",
+    "smoke:noise": "tsx scripts/smoke-noise.ts",
     "smoke:session": "tsx scripts/smoke-session.ts"
   },
   "dependencies": {

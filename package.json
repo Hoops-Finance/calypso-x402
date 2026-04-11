@@ -20,6 +20,7 @@
     "dev:web": "pnpm --filter @calypso/web run dev",
     "build": "pnpm -r run build",
     "smoke:swap": "pnpm --filter @calypso/api run smoke:swap",
+    "smoke:noise": "pnpm --filter @calypso/api run smoke:noise",
     "smoke:session": "pnpm --filter @calypso/api run smoke:session"
   }
 }
