@@ -13,6 +13,7 @@ import cors from "cors";
 import { ENV } from "../env.js";
 import { logger } from "../logger.js";
 import { buildX402Middleware } from "./x402.js";
+import { rateLimit } from "./rateLimit.js";
 import { handlePlan } from "./routes/plan.js";
 import { handleSimulate } from "./routes/simulate.js";
 import { handleAnalyze } from "./routes/analyze.js";
@@ -34,10 +35,13 @@ async function bootstrap(): Promise<void> {
   app.get("/report/:sessionId", handleReport);
   app.get("/events/:sessionId", handleEvents);
 
-  // x402-gated routes.
+  // x402-gated routes. The rate limiter for /plan sits in front of x402 so
+  // a hostile client can't burn our Gemma quota even if they bypass payment.
+  const planRateLimit = rateLimit({ windowMs: 60_000, max: 10, label: "plan" });
+  const simulateRateLimit = rateLimit({ windowMs: 60_000, max: 5, label: "simulate" });
   app.use(buildX402Middleware());
-  app.post("/plan", handlePlan);
-  app.post("/simulate", handleSimulate);
+  app.post("/plan", planRateLimit, handlePlan);
+  app.post("/simulate", simulateRateLimit, handleSimulate);
   app.post("/analyze", handleAnalyze);
 
   app.use((_req, res) => res.status(404).json({ error: "not found" }));

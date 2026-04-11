@@ -93,9 +93,25 @@ export function setStatus(session: Session, status: SessionStatus): void {
   publish(session, { type: "status", status });
 }
 
+// Circuit breaker: if a session accumulates more than this many errors
+// total, we abort all bots. Protects testnet from a misconfigured loop.
+const SESSION_ERROR_THRESHOLD = 25;
+
 export function appendBotLog(session: Session, entry: BotLogEntry): void {
   session.botLogs.push(entry);
   publish(session, { type: "bot_action", entry });
+
+  if (entry.action === "error") {
+    const errCount = session.botLogs.reduce(
+      (acc, l) => acc + (l.action === "error" ? 1 : 0),
+      0,
+    );
+    if (errCount >= SESSION_ERROR_THRESHOLD && session.status === "running") {
+      session.status = "failed";
+      publish(session, { type: "status", status: "failed" });
+      session.controller.abort();
+    }
+  }
 }
 
 export function appendAIFeedback(session: Session, entry: AIFeedbackEntry): void {
