@@ -8,6 +8,12 @@
   "engines": {
     "node": ">=20"
   },
+  "pnpm": {
+    "overrides": {
+      "hoops-sdk-types": "file:../hoops_sdk/packages/hoops-sdk-types",
+      "hoops-sdk-core": "file:../hoops_sdk/packages/hoops-sdk-core"
+    }
+  },
   "scripts": {
     "bootstrap-pay-to": "pnpm --filter @calypso/api run bootstrap-pay-to",
     "dev:api": "pnpm --filter @calypso/api run dev",

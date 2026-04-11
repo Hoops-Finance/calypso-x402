@@ -4,6 +4,10 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  hoops-sdk-types: file:../hoops_sdk/packages/hoops-sdk-types
+  hoops-sdk-core: file:../hoops_sdk/packages/hoops-sdk-core
+
 importers:
 
   .: {}
@@ -14,7 +18,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       '@stellar/stellar-sdk':
-        specifier: ^14.5.0
+        specifier: ^14.0.0
         version: 14.6.1
       cors:
         specifier: ^2.8.5
@@ -25,6 +29,15 @@ importers:
       express:
         specifier: ^4.21.2
         version: 4.22.1
+      hoops-sdk-actions:
+        specifier: file:../../../hoops_sdk/packages/hoops-sdk-actions
+        version: file:../hoops_sdk/packages/hoops-sdk-actions
+      hoops-sdk-core:
+        specifier: file:../../../hoops_sdk/packages/hoops-sdk-core
+        version: file:../hoops_sdk/packages/hoops-sdk-core
+      hoops-sdk-types:
+        specifier: file:../../../hoops_sdk/packages/hoops-sdk-types
+        version: file:../hoops_sdk/packages/hoops-sdk-types
       pino:
         specifier: ^9.5.0
         version: 9.14.0
@@ -536,6 +549,15 @@ packages:
 
   help-me@5.0.0:
     resolution: {integrity: sha512-7xgomUX6ADmcYzFik0HzAxh/73YlKR9bmFzf51CZwR+b6YtzU2m0u49hQCqV6SvlqIqsaxovfwdvbnsw3b/zpg==}
+
+  hoops-sdk-actions@file:../hoops_sdk/packages/hoops-sdk-actions:
+    resolution: {directory: ../hoops_sdk/packages/hoops-sdk-actions, type: directory}
+
+  hoops-sdk-core@file:../hoops_sdk/packages/hoops-sdk-core:
+    resolution: {directory: ../hoops_sdk/packages/hoops-sdk-core, type: directory}
+
+  hoops-sdk-types@file:../hoops_sdk/packages/hoops-sdk-types:
+    resolution: {directory: ../hoops_sdk/packages/hoops-sdk-types, type: directory}
 
   http-errors@2.0.1:
     resolution: {integrity: sha512-4FbRdAX+bSdmo4AUFuS0WNiPz8NgFt+r8ThgNWmlrjQjt1Q7ZR9+zTlce2859x4KSXrwIsaeTqDoKQmtP8pLmQ==}
@@ -1303,6 +1325,23 @@ snapshots:
       function-bind: 1.1.2
 
   help-me@5.0.0: {}
+
+  hoops-sdk-actions@file:../hoops_sdk/packages/hoops-sdk-actions:
+    dependencies:
+      '@stellar/stellar-sdk': 14.6.1
+      hoops-sdk-core: file:../hoops_sdk/packages/hoops-sdk-core
+      hoops-sdk-types: file:../hoops_sdk/packages/hoops-sdk-types
+    transitivePeerDependencies:
+      - debug
+
+  hoops-sdk-core@file:../hoops_sdk/packages/hoops-sdk-core:
+    dependencies:
+      '@stellar/stellar-sdk': 14.6.1
+      hoops-sdk-types: file:../hoops_sdk/packages/hoops-sdk-types
+    transitivePeerDependencies:
+      - debug
+
+  hoops-sdk-types@file:../hoops_sdk/packages/hoops-sdk-types: {}
 
   http-errors@2.0.1:
     dependencies:
