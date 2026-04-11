@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { PlanResponse } from "@calypso/shared";
-import { Button, Card, CardHeader, CardTitle, Badge, Textarea } from "../../components/ui";
+import type { PlanResponse, BotConfig, SessionConfig } from "@calypso/shared";
+import { Button, Card, CardHeader, CardTitle, Badge, Textarea, Input } from "../../components/ui";
+import { BotConfigEditor } from "../../components/BotConfigEditor";
 import { api, PaymentRequiredError } from "../../lib/apiClient";
 import { useWallet } from "../../components/WalletProvider";
+import { WalletHierarchy } from "../../components/WalletHierarchy";
 
 const SAMPLE_PROMPTS = [
   "stress test USDC/XLM liquidity across Soroswap and Phoenix for 5 minutes with 3 bots",
@@ -15,26 +17,64 @@ const SAMPLE_PROMPTS = [
 
 type Step = "prompt" | "review" | "launching" | "error";
 
+function blankBot(archetype: BotConfig["archetype"], idx: number): BotConfig {
+  const bot_id = `${archetype === "lp_manager" ? "lp" : archetype}-${idx}`;
+  switch (archetype) {
+    case "arbitrageur":
+      return {
+        archetype,
+        bot_id,
+        min_spread_bps: 15,
+        max_position_size: 50,
+        target_pairs: ["USDC/XLM"],
+        target_dexes: ["soroswap", "aqua"],
+        interval_seconds: 15,
+      };
+    case "noise":
+      return {
+        archetype,
+        bot_id,
+        interval_seconds: 12,
+        min_amount: 1,
+        max_amount: 4,
+        target_pools: ["soroswap:USDC/XLM"],
+      };
+    case "lp_manager":
+      return {
+        archetype,
+        bot_id,
+        rebalance_threshold: 0.2,
+        target_pool: "soroswap:USDC/XLM",
+        deposit_amount: 50,
+        interval_seconds: 25,
+      };
+  }
+}
+
 export default function SimulatePage() {
   const router = useRouter();
-  const { connected, address, connect } = useWallet();
+  const { connected, connect } = useWallet();
   const [prompt, setPrompt] = useState(SAMPLE_PROMPTS[0]!);
   const [step, setStep] = useState<Step>("prompt");
-  const [plan, setPlan] = useState<PlanResponse | null>(null);
-  const [planPaid, setPlanPaid] = useState(false);
+  const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null);
+  const [botConfigs, setBotConfigs] = useState<BotConfig[]>([]);
+  const [estimatedCost, setEstimatedCost] = useState(2.5);
   const [error, setError] = useState<string | null>(null);
+
+  function applyPlan(plan: PlanResponse) {
+    setSessionConfig(plan.session_config);
+    setBotConfigs(plan.bot_configs);
+    setEstimatedCost(plan.estimated_cost_usd);
+  }
 
   async function handlePlan() {
     setError(null);
     try {
       const plan = await api.plan({ prompt });
-      setPlan(plan);
-      setPlanPaid(true);
+      applyPlan(plan);
       setStep("review");
     } catch (err) {
       if (err instanceof PaymentRequiredError) {
-        // In dev mode the facilitator demands a signed payment header.
-        // Show the 402 clearly so the demo video can frame the moment.
         setError(
           `HTTP 402 — pay $0.50 USDC to planner wallet. In demo mode the server bypasses settlement; to run the real payment flow connect a funded Freighter wallet and retry.`,
         );
@@ -47,13 +87,13 @@ export default function SimulatePage() {
   }
 
   async function handleSimulate() {
-    if (!plan) return;
+    if (!sessionConfig) return;
     setError(null);
     setStep("launching");
     try {
       const sim = await api.simulate({
-        session_config: plan.session_config,
-        bot_configs: plan.bot_configs,
+        session_config: sessionConfig,
+        bot_configs: botConfigs,
       });
       router.push(`/sessions/${sim.session_id}`);
     } catch (err) {
@@ -69,20 +109,50 @@ export default function SimulatePage() {
     }
   }
 
+  function updateBot(idx: number, next: BotConfig) {
+    setBotConfigs((prev) => {
+      const copy = [...prev];
+      copy[idx] = next;
+      return copy;
+    });
+  }
+
+  function addBot(archetype: BotConfig["archetype"]) {
+    setBotConfigs((prev) => {
+      const nextIdx = prev.filter((b) => b.archetype === archetype).length + 1;
+      return [...prev, blankBot(archetype, nextIdx)];
+    });
+  }
+
+  function removeBot(idx: number) {
+    setBotConfigs((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateSessionConfig<K extends keyof SessionConfig>(key: K, value: SessionConfig[K]) {
+    setSessionConfig((prev) => (prev ? { ...prev, [key]: value } : prev));
+  }
+
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
+    <div className="max-w-5xl mx-auto px-6 py-12">
       <div className="mb-10">
-        <Badge tone="primary">step {step === "prompt" ? "1 of 2" : step === "review" ? "2 of 2" : "…"}</Badge>
+        <Badge tone="primary">
+          step {step === "prompt" ? "1 of 2" : step === "review" ? "2 of 2" : "…"}
+        </Badge>
         <h1 className="mt-3 text-3xl md:text-4xl font-bold">Run a simulation</h1>
         <p className="mt-2 text-muted-foreground">
           {step === "prompt"
             ? "Describe the market conditions you want Calypso to generate. Gemma 4 will plan the swarm."
             : step === "review"
-              ? "Review the AI-generated bot recipe. One tap to pay and launch."
+              ? "Review and edit the AI-generated bot recipe. Every field is editable before you launch."
               : step === "launching"
-                ? "Launching bot wallets, deploying smart accounts, wiring the swarm…"
+                ? "Launching bot wallets, deploying smart accounts, seeding USDC, wiring the swarm…"
                 : "Something went wrong."}
         </p>
+      </div>
+
+      {/* Persistent wallet hierarchy summary at the top */}
+      <div className="mb-8">
+        <WalletHierarchy showUser={true} />
       </div>
 
       {!connected && (
@@ -100,105 +170,140 @@ export default function SimulatePage() {
       )}
 
       {step === "prompt" && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>prompt</CardTitle>
-              {planPaid && <Badge tone="success">$0.50 paid</Badge>}
-            </CardHeader>
-            <Textarea
-              rows={4}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe the market you want Calypso to generate…"
-            />
-            <div className="mt-4 flex flex-wrap gap-2">
-              {SAMPLE_PROMPTS.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPrompt(p)}
-                  className="text-[11px] px-2.5 py-1 rounded-full border border-border text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors"
-                >
-                  {p.slice(0, 60)}…
-                </button>
-              ))}
+        <Card>
+          <CardHeader>
+            <CardTitle>prompt</CardTitle>
+          </CardHeader>
+          <Textarea
+            rows={4}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Describe the market you want Calypso to generate…"
+          />
+          <div className="mt-4 flex flex-wrap gap-2">
+            {SAMPLE_PROMPTS.map((p) => (
+              <button
+                key={p}
+                onClick={() => setPrompt(p)}
+                className="text-[11px] px-2.5 py-1 rounded-full border border-border text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors"
+              >
+                {p.slice(0, 60)}…
+              </button>
+            ))}
+          </div>
+          <div className="mt-6 flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              cost: <span className="text-primary font-semibold">$0.50 USDC</span> via x402
             </div>
-            <div className="mt-6 flex items-center justify-between">
-              <div className="text-xs text-muted-foreground">
-                cost: <span className="text-primary font-semibold">$0.50 USDC</span> via x402
-              </div>
-              <Button onClick={() => void handlePlan()} disabled={!prompt.trim()}>
-                plan session →
-              </Button>
-            </div>
-          </Card>
-        </>
+            <Button onClick={() => void handlePlan()} disabled={!prompt.trim()}>
+              plan session →
+            </Button>
+          </div>
+        </Card>
       )}
 
-      {step === "review" && plan && (
-        <div className="space-y-4">
+      {step === "review" && sessionConfig && (
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>session</CardTitle>
-              <Badge tone="primary">{plan.session_config.duration_minutes} min</Badge>
+              <Badge tone="primary">{sessionConfig.duration_minutes} min</Badge>
             </CardHeader>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">name</div>
-                <div className="mt-1 font-semibold">{plan.session_config.name}</div>
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">treasury</div>
-                <div className="mt-1 font-mono">{plan.session_config.initial_treasury_xlm} XLM</div>
-              </div>
-              <div className="col-span-2">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">target pools</div>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {plan.session_config.target_pools.map((p) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="block">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                  name
+                </div>
+                <Input
+                  value={sessionConfig.name}
+                  onChange={(e) => updateSessionConfig("name", e.target.value)}
+                />
+              </label>
+              <label className="block">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                  duration_minutes
+                </div>
+                <Input
+                  type="number"
+                  value={sessionConfig.duration_minutes}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    if (Number.isFinite(n) && n > 0 && n <= 180) {
+                      updateSessionConfig("duration_minutes", n);
+                    }
+                  }}
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                  target_pools
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sessionConfig.target_pools.map((p) => (
                     <Badge key={p}>{p}</Badge>
                   ))}
                 </div>
-              </div>
+              </label>
             </div>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>bots ({plan.bot_configs.length})</CardTitle>
-            </CardHeader>
-            <div className="space-y-3">
-              {plan.bot_configs.map((bot) => (
-                <div
-                  key={bot.bot_id}
-                  className="rounded-lg border border-border bg-background/50 p-3 flex items-start justify-between gap-3"
+              <CardTitle>bots ({botConfigs.length})</CardTitle>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => addBot("noise")}
+                  className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full border border-border hover:border-primary/50 hover:text-primary transition-colors"
                 >
-                  <div>
-                    <div className="font-mono text-sm text-primary">{bot.bot_id}</div>
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                      {bot.archetype}
-                    </div>
-                  </div>
-                  <pre className="text-[11px] text-muted-foreground font-mono max-w-[60%] overflow-x-auto">
-                    {JSON.stringify(bot, null, 0)}
-                  </pre>
-                </div>
+                  + noise
+                </button>
+                <button
+                  onClick={() => addBot("arbitrageur")}
+                  className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full border border-border hover:border-primary/50 hover:text-primary transition-colors"
+                >
+                  + arb
+                </button>
+                <button
+                  onClick={() => addBot("lp_manager")}
+                  className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full border border-border hover:border-primary/50 hover:text-primary transition-colors"
+                >
+                  + lp
+                </button>
+              </div>
+            </CardHeader>
+            <div className="space-y-4">
+              {botConfigs.map((bot, idx) => (
+                <BotConfigEditor
+                  key={idx}
+                  config={bot}
+                  onChange={(next) => updateBot(idx, next)}
+                  onRemove={() => removeBot(idx)}
+                />
               ))}
+              {botConfigs.length === 0 && (
+                <div className="text-sm text-muted-foreground italic">
+                  no bots — add at least one above
+                </div>
+              )}
             </div>
           </Card>
 
-          <div className="flex items-center justify-between gap-4 mt-6">
+          <div className="flex items-center justify-between gap-4">
             <div className="text-xs text-muted-foreground">
               total cost:{" "}
               <span className="text-primary font-semibold">
-                ${plan.estimated_cost_usd.toFixed(2)} USDC
+                ${estimatedCost.toFixed(2)} USDC
               </span>{" "}
-              · pay {address ? `from ${address.slice(0, 4)}…${address.slice(-4)}` : "after connect"}
+              · pays from your connected Freighter wallet
             </div>
             <div className="flex gap-3">
               <Button variant="ghost" onClick={() => setStep("prompt")}>
                 back
               </Button>
-              <Button onClick={() => void handleSimulate()}>
+              <Button
+                onClick={() => void handleSimulate()}
+                disabled={botConfigs.length === 0}
+              >
                 pay $2.00 & launch →
               </Button>
             </div>
@@ -213,7 +318,7 @@ export default function SimulatePage() {
             <div>
               <div className="text-lg font-semibold">spinning up the swarm</div>
               <div className="text-sm text-muted-foreground">
-                funding bot wallets via friendbot, deploying smart accounts, starting chassis loops…
+                funding bot wallets via friendbot, deploying smart accounts, seeding USDC, starting chassis loops…
               </div>
             </div>
           </div>

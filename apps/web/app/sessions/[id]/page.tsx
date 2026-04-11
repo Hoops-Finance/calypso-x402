@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { BotLogEntry, AIFeedbackEntry, Report, SessionStatus } from "@calypso/shared";
 import { Badge, Card, CardHeader, CardTitle, MetricCard } from "../../../components/ui";
 import { api, openEventStream } from "../../../lib/apiClient";
+import { WalletHierarchy } from "../../../components/WalletHierarchy";
 
 interface EventActionPayload {
   type: "bot_action";
@@ -159,11 +160,16 @@ export default function SessionDetail(props: { params: Promise<{ id: string }> }
       </div>
 
       {/* Metric strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <MetricCard label="total actions" value={metrics?.total_actions ?? 0} tone="primary" />
         <MetricCard label="swap volume" value={(summary?.gross_volume_usd ?? 0).toFixed(2)} sublabel="xlm" />
         <MetricCard label="failed txns" value={metrics?.failed_txns ?? 0} tone={metrics && metrics.failed_txns > 0 ? "warning" : "default"} />
         <MetricCard label="ai reviews" value={allFeedback.length} tone="primary" />
+      </div>
+
+      {/* Wallet hierarchy strip — live flow of funds view */}
+      <div className="mb-8">
+        <WalletHierarchy sessionId={id} showUser={false} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

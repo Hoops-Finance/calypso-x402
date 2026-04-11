@@ -19,6 +19,11 @@ import { handleSimulate } from "./routes/simulate.js";
 import { handleAnalyze } from "./routes/analyze.js";
 import { handleReport, handleListSessions } from "./routes/report.js";
 import { handleEvents } from "./routes/events.js";
+import {
+  handlePlatformWallet,
+  handleSessionWallets,
+  handleWalletByAddress,
+} from "./routes/wallets.js";
 import { startReviewerLoop } from "../ai/reviewer.js";
 import { listSessions as sessionList, getSession } from "../orchestrator/session.js";
 
@@ -34,6 +39,9 @@ async function bootstrap(): Promise<void> {
   app.get("/sessions", handleListSessions);
   app.get("/report/:sessionId", handleReport);
   app.get("/events/:sessionId", handleEvents);
+  app.get("/wallets/platform", handlePlatformWallet);
+  app.get("/wallets/balance", handleWalletByAddress);
+  app.get("/sessions/:sessionId/wallets", handleSessionWallets);
 
   // x402-gated routes. The rate limiter for /plan sits in front of x402 so
   // a hostile client can't burn our Gemma quota even if they bypass payment.

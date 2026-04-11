@@ -36,6 +36,9 @@ export function NavBar() {
             <Link href="/sessions" className="hover:text-foreground transition-colors">
               sessions
             </Link>
+            <Link href="/wallets" className="hover:text-foreground transition-colors">
+              wallets
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-3">
