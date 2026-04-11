@@ -26,6 +26,7 @@ import {
 } from "./routes/wallets.js";
 import { startReviewerLoop } from "../ai/reviewer.js";
 import { listSessions as sessionList, getSession } from "../orchestrator/session.js";
+import { PlatformWallet } from "../orchestrator/platformWallet.js";
 
 async function bootstrap(): Promise<void> {
   const app = express();
@@ -69,6 +70,14 @@ async function bootstrap(): Promise<void> {
   app.listen(ENV.API_PORT, () => {
     logger.info({ port: ENV.API_PORT }, "calypso api listening");
   });
+
+  // Kick off platform wallet bootstrap in the background. We intentionally
+  // don't await this so the server is listening immediately for /health
+  // and the UI's wallet polls. First /simulate may hang a few seconds
+  // on its first bot creation if init hasn't finished, which is fine.
+  void PlatformWallet.get()
+    .ensureInitialized()
+    .catch((err) => logger.error({ err }, "platformWallet: initial boot failed"));
 }
 
 bootstrap().catch((err) => {

@@ -18,6 +18,7 @@ import {
 } from "../../constants.js";
 import { ENV } from "../../env.js";
 import { getSession } from "../../orchestrator/session.js";
+import { PlatformWallet } from "../../orchestrator/platformWallet.js";
 import { logger } from "../../logger.js";
 
 const rpc = createRpcClientForNetwork(HOOPS_NETWORK);
@@ -39,13 +40,32 @@ async function readBalances(caller: string, addr: string): Promise<{ xlm: string
 
 export async function handlePlatformWallet(_req: Request, res: Response): Promise<void> {
   const addr = ENV.PAY_TO;
-  const balances = await readBalances(addr, addr);
+  const platform = PlatformWallet.get();
+  const smartAccountId = platform.state.smartAccountId;
+
+  // Read EOA balances and smart-account balances in parallel, then sum
+  // for the headline view. The UI cares about total USDC available to
+  // seed bots; the split between EOA and smart account is implementation.
+  const [eoa, smart] = await Promise.all([
+    readBalances(addr, addr),
+    smartAccountId
+      ? readBalances(addr, smartAccountId)
+      : Promise.resolve({ xlm: "0", usdc: "0" }),
+  ]);
+
+  const totalXlm = (BigInt(eoa.xlm) + BigInt(smart.xlm)).toString();
+  const totalUsdc = (BigInt(eoa.usdc) + BigInt(smart.usdc)).toString();
+
   res.json({
     label: "Calypso Orchestrator",
     role: "orchestrator",
     address: addr,
+    smart_account: smartAccountId,
     network: ENV.X402_NETWORK,
-    balances,
+    initialized: platform.state.initialized,
+    balances: { xlm: totalXlm, usdc: totalUsdc },
+    eoa_balances: eoa,
+    smart_balances: smart,
   });
 }
 
