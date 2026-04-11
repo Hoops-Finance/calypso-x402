@@ -14,10 +14,44 @@ export default function HomePage() {
           }}
           aria-hidden
         />
+        {/* Oversized decorative logo silhouette behind the hero text */}
+        <div
+          className="absolute pointer-events-none opacity-[0.07]"
+          style={{
+            right: "-120px",
+            top: "40px",
+            width: "720px",
+            height: "720px",
+            filter: "blur(0.5px)",
+          }}
+          aria-hidden
+        >
+          <Image
+            src="/images/calypso-logo.svg"
+            alt=""
+            width={720}
+            height={720}
+          />
+        </div>
         <div className="relative max-w-[1280px] mx-auto px-6 py-24 md:py-32">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
             <div className="lg:col-span-8">
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-4 mb-6">
+                <div
+                  className="relative w-16 h-16 shrink-0"
+                  style={{
+                    filter: "drop-shadow(0 0 18px hsl(var(--primary) / 0.4))",
+                  }}
+                >
+                  <Image
+                    src="/images/calypso-logo.svg"
+                    alt="Calypso"
+                    width={64}
+                    height={64}
+                    priority
+                  />
+                </div>
+                <div className="h-px flex-1 bg-border" />
                 <span className="ship-mark">stellar · x402 · stripe mpp</span>
                 <span className="font-mono text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
                   hackathon · 2026-04-13

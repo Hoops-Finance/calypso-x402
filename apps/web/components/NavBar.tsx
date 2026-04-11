@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { SessionWalletPill } from "./SessionWalletPill";
 import { ConnectWallet } from "./ConnectWallet";
 import { FriendbotButton } from "./FriendbotButton";
@@ -13,19 +14,20 @@ export function NavBar() {
         {/* Logo lockup */}
         <div className="flex items-center gap-10">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative">
-              <div
-                className="w-9 h-9 flex items-center justify-center border-2 border-primary bg-primary/10 font-display font-black text-primary text-lg"
-                style={{ transform: "rotate(-2deg)" }}
-              >
-                C
-              </div>
-              <div
-                className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-background border border-primary font-mono text-[7px] text-primary flex items-center justify-center"
-                style={{ fontWeight: 900 }}
-              >
-                ×
-              </div>
+            <div
+              className="relative w-12 h-12 flex items-center justify-center transition-transform duration-300 group-hover:scale-105"
+              style={{
+                filter:
+                  "drop-shadow(0 0 14px hsl(var(--primary) / 0.35)) drop-shadow(0 2px 6px rgba(0,0,0,0.4))",
+              }}
+            >
+              <Image
+                src="/images/calypso-logo.svg"
+                alt="Calypso"
+                width={48}
+                height={48}
+                priority
+              />
             </div>
             <div className="flex flex-col leading-none">
               <span className="font-display text-lg font-semibold text-paper tracking-tight">
