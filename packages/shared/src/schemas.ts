@@ -32,7 +32,7 @@ export const ArbitrageurConfigSchema = z.object({
   min_spread_bps: z.number().int().min(1).max(1000),
   max_position_size: z.number().positive(),
   target_pairs: z.array(TokenPairSchema).min(1),
-  target_dexes: z.array(DexIdSchema).min(2),
+  target_dexes: z.array(DexIdSchema).min(1),
   interval_seconds: z.number().int().min(1).max(300).default(15),
 });
 export type ArbitrageurConfig = z.infer<typeof ArbitrageurConfigSchema>;
@@ -194,6 +194,7 @@ export type AIFeedbackEntry = z.infer<typeof AIFeedbackEntrySchema>;
 export const SessionStatusSchema = z.enum([
   "planning",
   "running",
+  "stopping",
   "completed",
   "failed",
   "cancelled",

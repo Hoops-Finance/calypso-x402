@@ -1,17 +1,19 @@
 "use client";
 
 /**
- * SessionTimer — shows a live elapsed clock + countdown to the session
- * auto-end time. Ticks every 500ms. Formats:
- *
- *   ELAPSED   02:14       ENDS IN   00:46
- *   STARTED   22:14:07    ENDS AT   22:19:07
+ * SessionTimer — live elapsed + countdown. Ticks only while the session
+ * is "running". When it ends (completed / failed / cancelled / stopping),
+ * the elapsed clock FREEZES at the actual end time and shows a static
+ * "ENDED" marker — no runaway timer after the session is over.
  */
 
 import { useEffect, useState } from "react";
+import type { SessionStatus } from "@calypso/shared";
 
 export interface SessionTimerProps {
   startedAt: string; // ISO-8601
+  endedAt?: string | null;
+  status: SessionStatus | null;
   durationMinutes: number;
   compact?: boolean;
 }
@@ -35,19 +37,31 @@ function fmtTimeOfDay(ms: number): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-export function SessionTimer({ startedAt, durationMinutes, compact }: SessionTimerProps) {
+export function SessionTimer({
+  startedAt,
+  endedAt,
+  status,
+  durationMinutes,
+  compact,
+}: SessionTimerProps) {
+  const live = status === "running" || status === "planning";
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
+    if (!live) return;
     const t = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(t);
-  }, []);
+  }, [live]);
 
   const startMs = new Date(startedAt).getTime();
-  const endMs = startMs + durationMinutes * 60_000;
-  const elapsed = now - startMs;
-  const remaining = endMs - now;
-  const expired = remaining <= 0;
+  const plannedEndMs = startMs + durationMinutes * 60_000;
+  const actualEndMs = endedAt ? new Date(endedAt).getTime() : null;
+
+  // Freeze elapsed at the actual end time once the session is over.
+  const frozenNow = !live ? (actualEndMs ?? plannedEndMs) : now;
+  const elapsed = frozenNow - startMs;
+  const remaining = plannedEndMs - frozenNow;
+  const expired = !live || remaining <= 0;
 
   if (compact) {
     return (
@@ -67,9 +81,7 @@ export function SessionTimer({ startedAt, durationMinutes, compact }: SessionTim
   return (
     <div className="grid grid-cols-2 gap-6 font-mono">
       <div>
-        <div className="text-[9px] uppercase tracking-[0.22em] text-muted-foreground">
-          elapsed
-        </div>
+        <div className="text-[9px] uppercase tracking-[0.22em] text-muted-foreground">elapsed</div>
         <div className="text-3xl tabular-nums font-semibold text-foreground mt-1">
           {fmtClock(elapsed)}
         </div>
@@ -82,12 +94,16 @@ export function SessionTimer({ startedAt, durationMinutes, compact }: SessionTim
           {expired ? "status" : "ends in"}
         </div>
         <div
-          className={`text-3xl tabular-nums font-semibold mt-1 ${expired ? "text-[hsl(var(--info))]" : "text-primary"}`}
+          className={`text-3xl tabular-nums font-semibold mt-1 ${
+            expired ? "text-[hsl(var(--info))]" : "text-primary"
+          }`}
         >
           {expired ? "ENDED" : fmtClock(remaining)}
         </div>
         <div className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground mt-1">
-          ends at {fmtTimeOfDay(endMs)}
+          {actualEndMs
+            ? `ended ${fmtTimeOfDay(actualEndMs)}`
+            : `ends at ${fmtTimeOfDay(plannedEndMs)}`}
         </div>
       </div>
     </div>

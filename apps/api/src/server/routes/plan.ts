@@ -10,8 +10,8 @@ export async function handlePlan(req: Request, res: Response): Promise<void> {
     return;
   }
   try {
-    const plan = await planFromRequest(parsed.data);
-    res.json(plan);
+    const { plan, reasoning, model } = await planFromRequest(parsed.data);
+    res.json({ ...plan, _ai: { reasoning, model } });
   } catch (err) {
     logger.error({ err }, "planner crashed");
     res.status(500).json({ error: "planner crashed" });

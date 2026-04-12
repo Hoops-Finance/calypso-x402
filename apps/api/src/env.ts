@@ -42,4 +42,9 @@ export const ENV = {
   // XLM→USDC swap path entirely on testnet. Empty string means minting
   // is disabled and we fall back to self-swap.
   USDC_ADMIN_SECRET: process.env.USDC_ADMIN_SECRET ?? "",
+
+  // Secret key of the Calypso agent wallet — the x402 payer. Auto-
+  // generated on first boot if unset, then written back to .env so
+  // it persists across restarts.
+  AGENT_SECRET: process.env.AGENT_SECRET ?? "",
 } as const;

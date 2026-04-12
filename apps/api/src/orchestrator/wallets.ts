@@ -5,25 +5,23 @@
  *
  *   friendbot ────▶ bot EOA (10k XLM, standard testnet plumbing)
  *                    │
- *                    │ fundAccountXlm
+ *                    │ fundAccountXlm (EOA → smart account via SAC)
  *                    ▼
- *                  bot smart account ◀── orchestrator.transferUsdc
+ *                  bot smart account ◀── AGENT.transferUsdc
  *                                         (USDC originates at the
- *                                          orchestrator's smart account,
- *                                          either from x402 payments in
- *                                          prod or from admin mint in
- *                                          testnet demo mode)
+ *                                          Calypso AGENT wallet.
+ *                                          The agent is the autonomous
+ *                                          orchestrator and the sole
+ *                                          source of bot working capital.)
  *
- * Bots never create USDC. They receive it from the orchestrator. This
- * mirrors the production model where x402 payments flow in to the
- * orchestrator and are distributed to per-session bot wallets.
+ * Bots never create USDC. They receive it from the agent.
  */
 
 import { Keypair } from "@stellar/stellar-sdk";
 import { toStroops } from "hoops-sdk-core";
 import { createBotSession, type BotSession } from "../router/hoopsRouter.js";
 import { FRIENDBOT_URL, BOT_DEPLOY_XLM_FUNDING } from "../constants.js";
-import { PlatformWallet } from "./platformWallet.js";
+import { AgentWallet } from "./agentWallet.js";
 import { logger } from "../logger.js";
 
 export interface TreasuryWallet {
@@ -52,16 +50,15 @@ export async function createTreasury(): Promise<TreasuryWallet> {
 /**
  * Creates + funds a bot wallet end-to-end.
  *
- *   1. friendbot the fresh EOA   (XLM source)
- *   2. deploy the Hoops smart account
- *   3. fund the smart account with XLM from the EOA (SAC transfer)
- *   4. pull `usdcPerBot` USDC from the orchestrator's smart account
+ *   1. friendbot the fresh EOA   (XLM source, testnet free onramp)
+ *   2. deploy the Hoops smart account (the worker contract)
+ *   3. fund the smart account with XLM from the bot's own EOA via SAC
+ *   4. pull `usdcPerBot` USDC from the AGENT's wallet — serialized
+ *      via AgentWallet.transferUsdc so concurrent bot creations don't
+ *      race on the agent's sequence number
  *
- * Step 4's transferUsdc is serialized inside PlatformWallet via an
- * internal promise queue, so concurrent bot creations don't race on
- * the orchestrator's sequence number. If the orchestrator is out of
- * USDC the bot still launches and the LP bot handles the shortage
- * with a clean skip.
+ * If the agent runs out of USDC the bot still launches and the LP bot
+ * handles the shortage with a clean skip.
  */
 export async function createBotWallet(
   botId: string,
@@ -71,29 +68,26 @@ export async function createBotWallet(
   await friendbotFund(kp.publicKey());
   const session = await createBotSession(kp);
 
-  // XLM side: one-shot EOA → smart account transfer via XLM SAC.
-  // Works once per fresh keypair (the SAC tracks balance stingily
-  // after the first transfer, but fresh friendbot accounts always
-  // start with a clean SAC balance).
+  // XLM side: EOA → smart account transfer via XLM SAC. Works once
+  // per fresh keypair.
   await session.session.fundAccountXlm(BOT_DEPLOY_XLM_FUNDING);
 
-  // USDC side: orchestrator funds the bot, not the other way around.
-  // This is the architecturally correct direction — bots are pure
-  // consumers of platform-held USDC.
+  // USDC side: the AGENT transfers USDC to the bot's smart account.
+  // The agent signs with its own keypair. Queue-serialized.
   try {
-    const platform = PlatformWallet.get();
-    const txHash = await platform.transferUsdc(
+    const agent = AgentWallet.get();
+    const txHash = await agent.transferUsdc(
       session.smartAccountId,
       toStroops(usdcPerBot),
     );
     logger.info(
-      { botId, txHash, usdc: usdcPerBot },
-      "wallets: bot received USDC from orchestrator",
+      { botId, txHash, usdc: usdcPerBot, payer: agent.publicKey },
+      "wallets: bot received USDC from agent",
     );
   } catch (err) {
     logger.warn(
       { botId, err: err instanceof Error ? err.message : err },
-      "wallets: orchestrator USDC transfer failed — bot will operate XLM-only",
+      "wallets: agent USDC transfer failed — bot will operate XLM-only",
     );
   }
 
@@ -101,10 +95,8 @@ export async function createBotWallet(
 }
 
 /**
- * Best-effort shutdown. Today this is a no-op: testnet XLM is worthless
- * and withdrawing LP positions races the AI reviewer's final tick. On
- * mainnet this would liquidate LP, transfer XLM/USDC back to the
- * orchestrator, and zero out the smart account.
+ * Best-effort shutdown. Bot teardown (draining residual funds back
+ * to the agent) is handled by the dedicated teardown module.
  */
 export async function closeBotWallet(_bot: BotWallet): Promise<void> {
   return;

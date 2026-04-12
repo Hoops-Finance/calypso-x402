@@ -14,8 +14,15 @@ import {
   type BotConfig,
   type SessionConfig,
 } from "@calypso/shared";
-import { generate, stripFences } from "./gemma.js";
+import { generate, allJsonCandidates, extractReasoning } from "./gemma.js";
+import { ENV } from "../env.js";
 import { logger } from "../logger.js";
+
+export interface PlanResult {
+  plan: PlanResponse;
+  reasoning: string | null;
+  model: string;
+}
 
 const PLANNER_PROMPT = `You are Calypso, a DeFi simulation planner. Given a user request, emit a JSON object describing a bot swarm session for the Stellar testnet.
 
@@ -99,24 +106,49 @@ function buildUserMessage(req: PlanRequest): string {
   return `Structured request: ${JSON.stringify(req)}`;
 }
 
-export async function planFromRequest(req: PlanRequest): Promise<PlanResponse> {
+const MODELS_TO_TRY = [
+  ENV.AI_MODEL,           // gemma-4-31b-it by default
+  "gemini-2.5-flash",     // reliable JSON fallback
+];
+
+export async function planFromRequest(req: PlanRequest): Promise<PlanResult> {
   const user = buildUserMessage(req);
   const prompt = PLANNER_PROMPT + user;
 
   let lastError: unknown = null;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const raw = await generate(prompt, { temperature: 0.2 });
-      const stripped = stripFences(raw);
-      const json = JSON.parse(stripped);
-      const parsed = PlanResponseSchema.parse(json);
-      return parsed;
-    } catch (err) {
-      lastError = err;
-      logger.warn({ attempt, err: err instanceof Error ? err.message : err }, "planner: attempt failed");
+  for (const model of MODELS_TO_TRY) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const raw = await generate(prompt, { temperature: 0.2, model });
+        // Try every JSON candidate extractJson finds — the first one that
+        // passes the zod schema is the real plan, ignoring stray JSON
+        // fragments in Gemma's reasoning output.
+        const candidates = allJsonCandidates(raw);
+        let parsed: PlanResponse | null = null;
+        for (const c of candidates) {
+          try {
+            parsed = PlanResponseSchema.parse(JSON.parse(c));
+            break;
+          } catch {
+            // try next candidate
+          }
+        }
+        if (!parsed) {
+          throw new Error(`no candidate matched PlanResponseSchema (${candidates.length} tried)`);
+        }
+        const reasoning = extractReasoning(raw);
+        logger.info({ model, attempt }, "planner: success");
+        return { plan: parsed, reasoning, model };
+      } catch (err) {
+        lastError = err;
+        logger.warn(
+          { model, attempt, err: err instanceof Error ? err.message : err },
+          "planner: attempt failed",
+        );
+      }
     }
   }
 
-  logger.error({ lastError }, "planner: all attempts failed, returning default plan");
-  return defaultPlan();
+  logger.error({ lastError }, "planner: all models/attempts failed, returning default plan");
+  return { plan: defaultPlan(), reasoning: null, model: "default" };
 }

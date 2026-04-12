@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { SessionSummary } from "@calypso/shared";
 import { Button, Card, Badge } from "../../components/ui";
-import { api } from "../../lib/apiClient";
+import { agent } from "../../lib/apiClient";
 
 export default function SessionsIndex() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -15,7 +15,7 @@ export default function SessionsIndex() {
     let timer: ReturnType<typeof setInterval> | null = null;
     async function load() {
       try {
-        const res = await api.listSessions();
+        const res = await agent.listSessions();
         setSessions(res.sessions);
         setError(null);
       } catch (err) {

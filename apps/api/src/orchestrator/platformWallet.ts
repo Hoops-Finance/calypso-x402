@@ -275,6 +275,32 @@ export class PlatformWallet {
   }
 
   /**
+   * Withdraws USDC from the orchestrator smart account to an arbitrary
+   * recipient address. Same serialization + retry path as transferUsdc,
+   * just with human-facing semantics: the operator calls this from the
+   * /wallets page to pull money back out of Calypso.
+   */
+  async withdrawUsdc(
+    recipient: string,
+    amount: number,
+  ): Promise<{ hash: string; amountStroops: bigint }> {
+    const { toStroops } = await import("hoops-sdk-core");
+    const amountStroops = toStroops(amount);
+    const hash = await this.transferUsdc(recipient, amountStroops);
+    return { hash, amountStroops };
+  }
+
+  /**
+   * Returns the platform smart account's current USDC balance.
+   * Used by the teardown route to confirm recovery landed.
+   */
+  async getUsdcBalance(): Promise<bigint> {
+    await this.ensureInitialized();
+    if (!this.smartAccountId) return BigInt(0);
+    return this.usdcToken.balance(this.eoa, this.smartAccountId);
+  }
+
+  /**
    * Transfers `amountStroops` USDC from the orchestrator to `recipient`.
    *
    * Serialized via the internal txQueue so multiple concurrent callers

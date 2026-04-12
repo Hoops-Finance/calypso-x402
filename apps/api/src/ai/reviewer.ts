@@ -19,7 +19,7 @@ import {
   type AIFeedbackEntry,
   type Metrics,
 } from "@calypso/shared";
-import { generate, stripFences } from "./gemma.js";
+import { generate, allJsonCandidates } from "./gemma.js";
 import { summarize } from "../aggregator/summarize.js";
 import { applyDeltas } from "../orchestrator/configStore.js";
 import { appendAIFeedback, type Session } from "../orchestrator/session.js";
@@ -71,26 +71,42 @@ export async function reviewSession(session: Session): Promise<void> {
   const metrics: Metrics = summarize(session.botLogs, session.botConfigs);
   const prompt = REVIEWER_PROMPT + JSON.stringify(metrics, null, 2);
 
-  let raw: string;
-  try {
-    raw = await generate(prompt, { temperature: 0.1 });
-  } catch (err) {
-    logger.warn({ err, sessionId: session.id }, "reviewer: gemma call failed");
-    return;
+  const MODELS = [ENV.AI_MODEL, "gemini-2.5-flash"];
+  let deltas;
+  let usedModel = ENV.AI_MODEL;
+
+  for (const model of MODELS) {
+    let raw: string;
+    try {
+      raw = await generate(prompt, { temperature: 0.1, model });
+    } catch (err) {
+      logger.warn({ err, model, sessionId: session.id }, "reviewer: generate call failed");
+      continue;
+    }
+
+    const candidates = allJsonCandidates(raw);
+    let found = false;
+    for (const c of candidates) {
+      try {
+        deltas = AIReviewArraySchema.parse(JSON.parse(c));
+        usedModel = model;
+        state.consecutiveParseFailures.set(session.id, 0);
+        found = true;
+        break;
+      } catch {
+        // try next candidate
+      }
+    }
+    if (found) break;
+    logger.warn(
+      { sessionId: session.id, model, candidates: candidates.length },
+      "reviewer: no candidate matched AIReviewArraySchema",
+    );
   }
 
-  const stripped = stripFences(raw);
-  let deltas;
-  try {
-    deltas = AIReviewArraySchema.parse(JSON.parse(stripped));
-    state.consecutiveParseFailures.set(session.id, 0);
-  } catch (err) {
+  if (!deltas) {
     const n = (state.consecutiveParseFailures.get(session.id) ?? 0) + 1;
     state.consecutiveParseFailures.set(session.id, n);
-    logger.warn(
-      { sessionId: session.id, n, err: err instanceof Error ? err.message : err, raw: stripped.slice(0, 200) },
-      "reviewer: parse failed",
-    );
     if (n >= 3) {
       logger.error({ sessionId: session.id }, "reviewer: 3 consecutive parse failures, pausing for this session");
     }
@@ -102,7 +118,7 @@ export async function reviewSession(session: Session): Promise<void> {
     t: Date.now(),
     summary_in: metrics,
     deltas_out: applied,
-    model: ENV.AI_MODEL,
+    model: usedModel,
     parse_attempts: 1,
   };
   appendAIFeedback(session, entry);

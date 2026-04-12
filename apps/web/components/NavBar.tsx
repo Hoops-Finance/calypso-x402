@@ -1,8 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { SessionWalletPill } from "./SessionWalletPill";
+import { AgentPill } from "./AgentPill";
 import { ConnectWallet } from "./ConnectWallet";
-import { FriendbotButton } from "./FriendbotButton";
 
 export function NavBar() {
   return (
@@ -49,9 +48,8 @@ export function NavBar() {
 
         {/* Right cluster */}
         <div className="flex items-center gap-3">
-          <SessionWalletPill />
+          <AgentPill />
           <div className="hidden md:flex items-center gap-2">
-            <FriendbotButton />
             <ConnectWallet />
           </div>
         </div>

@@ -1,71 +1,36 @@
 "use client";
 
 /**
- * ProtocolTicker — a fixed tickertape at the very top of the page that
- * shows recent HTTP traffic hitting the Calypso API. Serves as the
- * running protocol narrator: "POST /plan 402 … POST /plan 200 …
- * POST /simulate 402 …". Subscribes to the x402 client event stream.
+ * ProtocolTicker — a fixed tickertape at the very top of the page.
  *
- * It's always visible. Even on pages that don't trigger calls, it
- * shows a slow base loop of health pings, so the stage never feels
- * dead. Reinforces the "this is a live protocol" narrative.
+ * Shows a static protocol-narration loop: GET /health, POST /plan 402
+ * → 200, POST /simulate 402 → 200, GET /agent, etc. It's visual
+ * flavor, not live traffic — live traffic is surfaced in the ceremony
+ * modal and the session log tape where it actually means something.
  */
 
-import { useEffect, useState } from "react";
-import { subscribeX402 } from "../lib/x402Client";
+import type { ReactNode } from "react";
 
 interface TickerItem {
   id: number;
   method: "POST" | "GET";
   path: string;
-  status: "402" | "200" | "sent" | "err";
-  t: number;
+  status: "402" | "200";
 }
 
-const SEED: TickerItem[] = [
-  { id: 0, method: "GET",  path: "/health",           status: "200", t: Date.now() },
-  { id: 1, method: "GET",  path: "/wallets/platform", status: "200", t: Date.now() },
-  { id: 2, method: "POST", path: "/plan",             status: "402", t: Date.now() },
-  { id: 3, method: "POST", path: "/plan",             status: "200", t: Date.now() },
-  { id: 4, method: "POST", path: "/simulate",         status: "402", t: Date.now() },
-  { id: 5, method: "POST", path: "/simulate",         status: "200", t: Date.now() },
-  { id: 6, method: "GET",  path: "/report/:id",       status: "200", t: Date.now() },
+const LOOP: TickerItem[] = [
+  { id: 0, method: "GET", path: "/health", status: "200" },
+  { id: 1, method: "GET", path: "/agent", status: "200" },
+  { id: 2, method: "GET", path: "/wallets/platform", status: "200" },
+  { id: 3, method: "POST", path: "/plan", status: "402" },
+  { id: 4, method: "POST", path: "/plan", status: "200" },
+  { id: 5, method: "POST", path: "/simulate", status: "402" },
+  { id: 6, method: "POST", path: "/simulate", status: "200" },
+  { id: 7, method: "GET", path: "/agent/session/:id", status: "200" },
+  { id: 8, method: "POST", path: "/agent/stop/:id", status: "200" },
 ];
 
 export function ProtocolTicker() {
-  const [items, setItems] = useState<TickerItem[]>(SEED);
-
-  useEffect(() => {
-    let idCounter = 100;
-    const unsub = subscribeX402((evt) => {
-      const status: TickerItem["status"] =
-        evt.kind === "payment-required"
-          ? "402"
-          : evt.kind === "settled"
-            ? "200"
-            : evt.kind === "error"
-              ? "err"
-              : "sent";
-      const method: "POST" | "GET" = evt.path.includes("/plan") || evt.path.includes("/simulate") || evt.path.includes("/analyze") ? "POST" : "GET";
-      const path = (() => {
-        try {
-          return new URL(evt.path).pathname;
-        } catch {
-          return evt.path;
-        }
-      })();
-      setItems((prev) =>
-        [
-          { id: idCounter++, method, path, status, t: Date.now() },
-          ...prev.slice(0, 11),
-        ].slice(0, 12),
-      );
-    });
-    return () => {
-      unsub();
-    };
-  }, []);
-
   return (
     <div
       className="fixed top-0 left-0 right-0 z-[60] border-b border-border/60 bg-ink/95 backdrop-blur-md"
@@ -73,8 +38,12 @@ export function ProtocolTicker() {
     >
       <div className="marquee h-full items-center">
         <div className="marquee__track h-full items-center">
-          {[...items, ...items].map((item, idx) => (
-            <TickerEntry key={`${item.id}-${idx}`} item={item} />
+          {[...LOOP, ...LOOP, ...LOOP].map((item, idx) => (
+            <TickerEntry key={`${item.id}-${idx}`} item={item}>
+              <span className={`method-badge method-${item.method}`}>{item.method}</span>
+              <span className="text-foreground/80">{item.path}</span>
+              <span className={`method-badge method-${item.status}`}>{item.status}</span>
+            </TickerEntry>
           ))}
         </div>
       </div>
@@ -82,22 +51,10 @@ export function ProtocolTicker() {
   );
 }
 
-function TickerEntry({ item }: { item: TickerItem }) {
-  const statusClass =
-    item.status === "402"
-      ? "method-402"
-      : item.status === "200"
-        ? "method-200"
-        : item.status === "err"
-          ? "method-402"
-          : "method-GET";
+function TickerEntry({ children }: { item: TickerItem; children: ReactNode }) {
   return (
     <div className="flex items-center gap-2 px-5 font-mono text-[10px] uppercase tracking-wider">
-      <span className={`method-badge method-${item.method}`}>{item.method}</span>
-      <span className="text-foreground/80">{item.path}</span>
-      <span className={`method-badge ${statusClass}`}>
-        {item.status === "sent" ? "…" : item.status}
-      </span>
+      {children}
       <span className="w-1 h-1 rounded-full bg-border mx-2" />
     </div>
   );

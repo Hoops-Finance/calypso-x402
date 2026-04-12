@@ -1,25 +1,34 @@
 /**
  * x402.ts — Express payment middleware for Calypso's gated endpoints.
  *
- * Gated routes, prices, and payment destination all live here. Pairing
- * with a facilitator at www.x402.org by default; set X402_FACILITATOR_URL
- * to self-host (e.g. OpenZeppelin Relayer).
+ * Route configuration uses AssetAmount directly instead of a dollar
+ * string, which pins the payment asset to the Hoops testnet USDC
+ * contract. The default ExactStellarScheme behavior falls back to
+ * Circle's testnet USDC contract which the agent wallet has no
+ * trustline to — so explicitly specifying the Hoops USDC contract
+ * keeps the x402 handshake working against the agent we control.
+ *
+ * USDC amounts are specified in stroops (7 decimals):
+ *   $0.50 = 5_000_000 stroops
+ *   $2.00 = 20_000_000 stroops
  */
 
 import { paymentMiddlewareFromConfig } from "@x402/express";
-import { HTTPFacilitatorClient } from "@x402/core/server";
 import { ExactStellarScheme } from "@x402/stellar/exact/server";
 import type { Network, SchemeNetworkServer } from "@x402/core/types";
 import { ENV } from "../env.js";
+import { TOKENS } from "../constants.js";
 import { logger } from "../logger.js";
+import { buildLocalFacilitator } from "./localFacilitator.js";
 
 const network = ENV.X402_NETWORK as Network;
+const HOOPS_USDC_ASSET = TOKENS.usdc;
 
 const routes = {
   "POST /plan": {
     accepts: {
       scheme: "exact",
-      price: "$0.50",
+      price: { asset: HOOPS_USDC_ASSET, amount: "5000000" }, // 0.5 USDC
       network,
       payTo: ENV.PAY_TO,
     },
@@ -28,16 +37,16 @@ const routes = {
   "POST /simulate": {
     accepts: {
       scheme: "exact",
-      price: "$2.00",
+      price: { asset: HOOPS_USDC_ASSET, amount: "20000000" }, // 2.0 USDC
       network,
       payTo: ENV.PAY_TO,
     },
-    description: "Launches a live bot swarm on Stellar testnet",
+    description: "Registers a Calypso simulation session and returns an id",
   },
   "POST /analyze": {
     accepts: {
       scheme: "exact",
-      price: "$0.50",
+      price: { asset: HOOPS_USDC_ASSET, amount: "5000000" }, // 0.5 USDC
       network,
       payTo: ENV.PAY_TO,
     },
@@ -45,12 +54,17 @@ const routes = {
   },
 };
 
-export function buildX402Middleware() {
+export async function buildX402Middleware() {
   logger.info(
-    { payTo: ENV.PAY_TO, facilitator: ENV.X402_FACILITATOR_URL, network: ENV.X402_NETWORK },
-    "x402: configuring payment middleware",
+    {
+      payTo: ENV.PAY_TO,
+      network: ENV.X402_NETWORK,
+      asset: HOOPS_USDC_ASSET,
+    },
+    "x402: configuring payment middleware (Hoops testnet USDC, local facilitator)",
   );
-  const facilitator = new HTTPFacilitatorClient({ url: ENV.X402_FACILITATOR_URL });
+  const { client: facilitator, facilitatorPubkey } = await buildLocalFacilitator(network);
+  logger.info({ facilitatorPubkey }, "x402: in-process facilitator ready");
   const schemes: { network: Network; server: SchemeNetworkServer }[] = [
     { network, server: new ExactStellarScheme() },
   ];

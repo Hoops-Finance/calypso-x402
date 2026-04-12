@@ -108,8 +108,8 @@ export default function HomePage() {
                     <div className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
                       facilitator
                     </div>
-                    <div className="font-mono text-[10px] text-foreground mt-0.5 break-all">
-                      www.x402.org/facilitator
+                    <div className="font-mono text-[10px] text-foreground mt-0.5">
+                      local · in-process
                     </div>
                   </div>
                 </div>
@@ -135,21 +135,21 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Stage index="01" label="plan">
-              POST <code className="text-primary">/plan</code> with a natural
-              language brief. Gemma 4 returns a validated SessionConfig and bot
-              recipe. First x402 payment ($0.50 USDC) runs the planner.
+            <Stage index="01" label="agent pays">
+              The Calypso <span className="text-primary">Agent</span> signs two
+              real x402 payments — $0.50 for <code>/plan</code> and $2.00 for{" "}
+              <code>/simulate</code> — with its own Ed25519 keypair. You watch,
+              you don&apos;t sign.
             </Stage>
-            <Stage index="02" label="simulate">
-              POST <code className="text-primary">/simulate</code> returns{" "}
-              <code>HTTP 402</code>. Your session wallet signs a Stellar Soroban
-              auth entry. Facilitator settles on-chain. Bot smart accounts
-              deploy and start trading via the Hoops router.
+            <Stage index="02" label="bots deploy">
+              The agent spawns ephemeral bot wallets (EOA + Hoops smart account
+              per bot), funds them with USDC, and kicks off rule-based chassis
+              loops that route through the Hoops router.
             </Stage>
-            <Stage index="03" label="watch">
-              SSE stream feeds every bot action to the session page. Every five
-              minutes Gemma reviews the aggregated metrics and pushes parameter
-              deltas back to the swarm. Real trades on stellar.expert.
+            <Stage index="03" label="watch &amp; stop">
+              SSE streams every bot action to the session page. Gemma 4 reviews
+              metrics every 5 minutes and pushes parameter deltas back. Hit STOP
+              to abort and drain bot funds back to the agent.
             </Stage>
           </div>
         </div>

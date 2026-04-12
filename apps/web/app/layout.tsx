@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Geist, JetBrains_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 import { WalletProvider } from "../components/WalletProvider";
-import { SessionWalletProvider } from "../components/SessionWalletProvider";
 import { NavBar } from "../components/NavBar";
 import { ProtocolTicker } from "../components/ProtocolTicker";
 
@@ -44,28 +43,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="min-h-screen flex flex-col bg-background text-foreground">
         <WalletProvider>
-          <SessionWalletProvider>
-            <ProtocolTicker />
-            <NavBar />
-            <main className="flex-1 pt-[120px] relative z-[2]">{children}</main>
-            <footer className="border-t border-border/60 mt-24 py-8 relative z-[2]">
-              <div className="max-w-7xl mx-auto px-6 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-muted-foreground gap-6">
-                <div className="flex items-center gap-3">
-                  <img
-                    src="/images/calypso-logo.svg"
-                    alt=""
-                    width={26}
-                    height={26}
-                    aria-hidden
-                    className="opacity-70"
-                    style={{ filter: "drop-shadow(0 0 6px hsl(var(--primary) / 0.3))" }}
-                  />
-                  <span className="font-mono">CALYPSO/SWARM · v0.1 · STELLAR TESTNET</span>
-                </div>
-                <div className="font-mono">GDQ4…WBIE · x402 FACILITATOR LIVE</div>
+          <ProtocolTicker />
+          <NavBar />
+          <main className="flex-1 pt-[120px] relative z-[2]">{children}</main>
+          <footer className="border-t border-border/60 mt-24 py-8 relative z-[2]">
+            <div className="max-w-7xl mx-auto px-6 flex items-center justify-between text-[10px] uppercase tracking-[0.2em] text-muted-foreground gap-6">
+              <div className="flex items-center gap-3">
+                <img
+                  src="/images/calypso-logo.svg"
+                  alt=""
+                  width={26}
+                  height={26}
+                  aria-hidden
+                  className="opacity-70"
+                  style={{ filter: "drop-shadow(0 0 6px hsl(var(--primary) / 0.3))" }}
+                />
+                <span className="font-mono">CALYPSO/SWARM · v0.1 · STELLAR TESTNET</span>
               </div>
-            </footer>
-          </SessionWalletProvider>
+              <div className="font-mono">LOCAL FACILITATOR · x402 PROTOCOL v2</div>
+            </div>
+          </footer>
         </WalletProvider>
       </body>
     </html>
