@@ -1,27 +1,24 @@
-FROM node:22-slim AS base
+FROM node:22-slim
 RUN corepack enable && corepack prepare pnpm@10.8.1 --activate
 WORKDIR /app
 
-# Install dependencies
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/api/package.json apps/api/
-COPY apps/web/package.json apps/web/
-COPY packages/shared/package.json packages/shared/
-COPY vendor/ vendor/
+# Copy everything
+COPY . .
+
+# Install deps
 RUN pnpm install --frozen-lockfile
 
-# Copy source and build
-COPY . .
-RUN pnpm run build
+# Build only the shared package (needed by both api and web) and the web app.
+# The API runs via tsx at runtime — no tsc compilation needed.
+RUN pnpm --filter @calypso/shared run build
+RUN pnpm --filter @calypso/web run build
 
-# Production
-FROM node:22-slim AS runner
-RUN corepack enable && corepack prepare pnpm@10.8.1 --activate
-WORKDIR /app
-COPY --from=base /app .
+# Install tsx globally for the API runtime
+RUN npm install -g tsx
 
 ENV NODE_ENV=production
 ENV API_PORT=9990
-EXPOSE 9990
+EXPOSE 9990 3000
 
-CMD ["node", "apps/api/dist/src/server/index.js"]
+# Run the API with tsx (same as dev mode, handles TypeScript directly)
+CMD ["tsx", "apps/api/src/server/index.ts"]
