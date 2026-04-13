@@ -10,11 +10,7 @@
       "import": "./dist/index.js"
     }
   },
-  "scripts": {
-    "build": "tsc",
-    "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit"
-  },
+  "scripts": {},
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.9.0"
