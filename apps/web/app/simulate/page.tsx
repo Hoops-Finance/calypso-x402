@@ -20,6 +20,7 @@ import {
   agent,
   planStream,
   shortHash,
+  shortAddr,
   txExplorerUrl,
   type AgentLaunchResponse,
   type X402Trace,
@@ -338,7 +339,7 @@ export default function SimulatePage() {
                     : line.tone === "primary" ? "text-primary"
                     : line.tone === "info" ? "text-[hsl(var(--info))]"
                     : "text-muted-foreground";
-                  const time = new Date(line.t).toISOString().slice(11, 19);
+                  const time = line.t && Number.isFinite(line.t) ? new Date(line.t).toISOString().slice(11, 19) : "--:--:--";
                   return isReasoning ? (
                     <div key={i} className="ml-[78px] text-muted-foreground/70 text-[10px] leading-snug">{line.text}</div>
                   ) : (
@@ -432,15 +433,34 @@ export default function SimulatePage() {
 
             {/* x402 receipt for the plan payment */}
             {aiPlan?.trace?.payment_tx_hash && (
-              <div className="border border-[hsl(var(--ink-stamp)/0.3)] bg-[hsl(var(--ink-stamp)/0.03)] p-4 flex items-center justify-between gap-4">
-                <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                  plan paid · $0.01 USDC · tx{" "}
-                  <a href={txExplorerUrl(aiPlan.trace.payment_tx_hash)} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                    {shortHash(aiPlan.trace.payment_tx_hash)}
-                  </a>
+              <div className="border border-[hsl(var(--ink-stamp)/0.4)] bg-[hsl(var(--ink-stamp)/0.05)] p-5 corner-marks">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="method-badge method-402">402</span>
+                    <span className="method-badge method-200">200</span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-foreground">
+                      POST /plan · $0.01 USDC settled on-chain
+                    </span>
+                  </div>
+                  <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-[hsl(var(--ink-stamp))] font-bold">
+                    x402 paid
+                  </div>
                 </div>
-                <div className="font-mono text-[9px] uppercase tracking-[0.22em] text-[hsl(var(--ink-stamp))]">
-                  x402 settled
+                <div className="flex items-center gap-6 font-mono text-[11px]">
+                  <div>
+                    <span className="text-muted-foreground">tx </span>
+                    <a href={txExplorerUrl(aiPlan.trace.payment_tx_hash)} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                      {shortHash(aiPlan.trace.payment_tx_hash)}
+                    </a>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">payer </span>
+                    <span className="text-foreground">{shortAddr(aiPlan.trace.payer)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">model </span>
+                    <span className="text-foreground">{aiPlan.model}</span>
+                  </div>
                 </div>
               </div>
             )}

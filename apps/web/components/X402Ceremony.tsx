@@ -60,7 +60,7 @@ export function progressToLine(evt: SimulateProgressEvent): TerminalLine {
     case "reasoning":
       return { t: evt.t, icon: " ", text: evt.message, tone: "default" };
     case "info":
-      return { t: evt.t, icon: " ", text: evt.message, tone: "default" };
+      return { t: evt.t, icon: " ", text: evt.message, tone: "info" };
     case "launching":
       return { t: evt.t, icon: "…", text: evt.message, tone: "primary" };
     case "done":

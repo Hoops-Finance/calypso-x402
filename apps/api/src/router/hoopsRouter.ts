@@ -67,6 +67,9 @@ export const ADAPTERS_BY_ID = {
 // Comet excluded — stale testnet pools return absurd quotes.
 const ENABLED_ADAPTERS: Set<number> = new Set([ADAPTERS_BY_ID.soroswap, ADAPTERS_BY_ID.aqua, ADAPTERS_BY_ID.phoenix]);
 
+// Round-robin counter for distributing swaps across DEXes
+let swapCounter = 0;
+
 // Map adapter IDs to their on-chain contract addresses for direct calls
 const ADAPTER_ADDRESS_BY_ID: Record<number, string> = {
   [ADAPTERS_BY_ID.aqua]: ADAPTERS.aqua,
@@ -185,15 +188,19 @@ export async function swapXlmToUsdc(bot: BotSession, xlmAmount: number): Promise
   const quoteSnapshot = await getAllQuotes(bot.pubkey, amountIn, TOKENS.xlm, TOKENS.usdc)
     .catch(() => [] as BestQuote[]);
 
-  // Find best quote among enabled adapters
-  let best: BestQuote | null = null;
-  for (const q of quoteSnapshot) {
-    if (!best || q.amountOut > best.amountOut) best = q;
+  // Round-robin across adapters that returned valid quotes so all
+  // active DEXes get traffic. Better for demo visibility than always
+  // routing to the cheapest adapter.
+  const validQuotes = quoteSnapshot.filter((q) => q.amountOut > 0n);
+  let picked: BestQuote | null = null;
+  if (validQuotes.length > 0) {
+    picked = validQuotes[swapCounter % validQuotes.length]!;
+    swapCounter++;
   }
 
-  const bestAdapterId = best?.adapterId ?? ADAPTERS_BY_ID.soroswap;
+  const bestAdapterId = picked?.adapterId ?? ADAPTERS_BY_ID.soroswap;
   const bestAdapterName = ADAPTER_NAME_BY_ID[bestAdapterId] ?? "unknown";
-  const bestPoolAddress = best?.poolAddress ?? POOLS.soroswapPair;
+  const bestPoolAddress = picked?.poolAddress ?? POOLS.soroswapPair;
 
   // Try best-priced adapter
   try {
@@ -203,7 +210,7 @@ export async function swapXlmToUsdc(bot: BotSession, xlmAmount: number): Promise
       txHash = await bot.session.swapXlmToUsdc(xlmAmount, POOLS.soroswapPair);
     } else {
       // Aqua/Phoenix: direct adapter call (bypasses smart account auth issue)
-      txHash = await swapViaAdapter(bot, bestAdapterId, amountIn, best?.amountOut ?? 0n);
+      txHash = await swapViaAdapter(bot, bestAdapterId, amountIn, picked?.amountOut ?? 0n);
     }
 
     logger.info(
@@ -217,7 +224,7 @@ export async function swapXlmToUsdc(bot: BotSession, xlmAmount: number): Promise
       adapterName: bestAdapterName,
       poolAddress: bestPoolAddress,
       amountIn,
-      expectedAmountOut: best?.amountOut ?? 0n,
+      expectedAmountOut: picked?.amountOut ?? 0n,
       quoteSnapshot,
     };
   } catch (err) {

@@ -39,10 +39,11 @@ export default function WalletsPage() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Action card state — three independent slots
+  // Action card state
   const [mint, setMint] = useState<ActionState>({ amount: "100" });
   const [fund, setFund] = useState<ActionState>({ amount: "20" });
   const [withdraw, setWithdraw] = useState<ActionState>({ amount: "5" });
+  const [quickFund, setQuickFund] = useState<ActionState>({ amount: "50" });
 
   useEffect(() => {
     let alive = true;
@@ -143,6 +144,32 @@ export default function WalletsPage() {
     }
   }
 
+  async function handleQuickFundAgent() {
+    if (!agentStatus?.address) return;
+    const amount = Number(quickFund.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setQuickFund((s) => ({ ...s, message: "invalid amount", error: true }));
+      return;
+    }
+    setQuickFund((s) => ({ ...s, busy: true, message: undefined, error: false }));
+    try {
+      const res = await admin.mintUsdc(agentStatus.address, amount);
+      setQuickFund((s) => ({
+        ...s,
+        busy: false,
+        message: `minted ${amount} USDC to agent · tx ${res.tx.slice(0, 10)}…`,
+        error: false,
+      }));
+    } catch (err) {
+      setQuickFund((s) => ({
+        ...s,
+        busy: false,
+        message: err instanceof Error ? err.message : String(err),
+        error: true,
+      }));
+    }
+  }
+
   async function handleWithdraw() {
     if (!freighterAddr) {
       setWithdraw((s) => ({
@@ -203,8 +230,55 @@ export default function WalletsPage() {
       </div>
 
       {error && (
-        <div className="mb-6 border border-destructive/40 p-4 font-mono text-xs text-destructive">
-          API ERROR · {error}
+        <div className="mb-6 border border-destructive/40 bg-destructive/5 p-5 corner-marks">
+          <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-destructive mb-2">
+            connection error
+          </div>
+          <div className="font-mono text-xs text-destructive/80">{error}</div>
+          <div className="mt-3 text-[11px] text-muted-foreground leading-relaxed">
+            Make sure the API is running: <code className="font-mono text-primary bg-primary/10 px-1">pnpm dev:api</code> on port 9990.
+            The agent wallet auto-initializes on first boot (friendbot + USDC top-up).
+          </div>
+        </div>
+      )}
+
+      {/* AGENT STATUS — always visible, shows readiness + balance */}
+      {agentStatus && (
+        <div className="mb-6 border border-border-strong bg-card/60 corner-marks">
+          <div className="hazard-stripes h-1 w-full" aria-hidden />
+          <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <span className="w-2 h-2 rounded-full bg-[hsl(var(--success))] shadow-[0_0_10px_hsl(var(--success))]" />
+              <div>
+                <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                  calypso agent · {agentStatus.ready ? "ready" : "initializing"}
+                </div>
+                <div className="font-mono text-sm text-foreground mt-0.5">
+                  {agentStatus.address}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">USDC</div>
+                <div className="font-mono text-2xl font-bold tabular-nums text-primary">
+                  {(Number(agentStatus.balances.usdc) / 10_000_000).toFixed(2)}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">XLM</div>
+                <div className="font-mono text-lg tabular-nums text-foreground">
+                  {(Number(agentStatus.balances.xlm) / 10_000_000).toFixed(0)}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground">sessions</div>
+                <div className="font-mono text-lg tabular-nums text-foreground">
+                  {agentStatus.sessions}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -260,11 +334,52 @@ export default function WalletsPage() {
         <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-3">
           B · money movement
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <ActionCard
+            step="00"
+            title="Quick Fund Agent"
+            subtitle="testnet · no wallet needed"
+            body="Mint testnet USDC directly to the Calypso Agent. No Freighter connection required. This is the fastest way to get the agent funded and ready to run simulations."
+            disabled={!agentStatus}
+            disabledReason="waiting for agent to initialize"
+            tone="primary"
+            amount={quickFund.amount}
+            setAmount={(v) => setQuickFund({ ...quickFund, amount: v })}
+            busy={quickFund.busy}
+            message={quickFund.message}
+            messageIsError={quickFund.error}
+            onClick={handleQuickFundAgent}
+            buttonLabel="mint to agent"
+            footer={agentStatus ? `to · ${shortAddr(agentStatus.address)}` : undefined}
+          />
+
+          <ActionCard
+            step="03"
+            title="Withdraw from Agent"
+            subtitle="agent → you"
+            body="Pull USDC out of the Calypso Agent wallet back to your Freighter address. The agent signs and submits the Soroban token transfer itself — no user signature required."
+            disabled={!connected}
+            disabledReason="connect freighter as destination"
+            tone="info"
+            amount={withdraw.amount}
+            setAmount={(v) => setWithdraw({ ...withdraw, amount: v })}
+            busy={withdraw.busy}
+            message={withdraw.message}
+            messageIsError={withdraw.error}
+            onClick={handleWithdraw}
+            buttonLabel="withdraw"
+            footer={connected ? `to · ${shortAddr(freighterAddr)}` : undefined}
+          />
+        </div>
+
+        <div className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground mb-3">
+          C · freighter wallet actions
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ActionCard
             step="01"
             title="Mint testnet USDC"
-            subtitle="user faucet"
+            subtitle="to your freighter"
             body="Get USDC into your Freighter wallet. Testnet shim via the admin mint key (Calypso owns the USDC contract on Hoops testnet)."
             disabled={!connected}
             disabledReason="connect freighter first"
@@ -297,23 +412,6 @@ export default function WalletsPage() {
             footer={agentStatus ? `to · ${shortAddr(agentStatus.address)}` : undefined}
           />
 
-          <ActionCard
-            step="03"
-            title="Withdraw from Agent"
-            subtitle="agent → you"
-            body="Pull USDC out of the Calypso Agent wallet back to your Freighter address. The agent signs and submits the Soroban token transfer itself — no user signature required."
-            disabled={!connected}
-            disabledReason="connect freighter as destination"
-            tone="info"
-            amount={withdraw.amount}
-            setAmount={(v) => setWithdraw({ ...withdraw, amount: v })}
-            busy={withdraw.busy}
-            message={withdraw.message}
-            messageIsError={withdraw.error}
-            onClick={handleWithdraw}
-            buttonLabel="withdraw"
-            footer={connected ? `to · ${shortAddr(freighterAddr)}` : undefined}
-          />
         </div>
       </section>
 
