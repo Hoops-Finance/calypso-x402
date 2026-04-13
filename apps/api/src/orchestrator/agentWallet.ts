@@ -50,11 +50,10 @@ import { logger } from "../logger.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT_ENV = resolve(__dirname, "../../../../.env");
 
-// Keep the agent topped up at least to this USDC balance so a session
-// launch doesn't stall on payment. ~20 USDC covers many /plan + /simulate
-// rounds at $0.50 + $2.00 each.
+// Keep the agent topped up so sessions don't stall. At $0.06/session
+// (plan + simulate) even 10 USDC covers hundreds of runs.
 const AGENT_TARGET_USDC = 50;
-const AGENT_MIN_USDC_STROOPS = BigInt(60_000_000); // 6 USDC floor — enough for 2 full sessions ($2.50 x402 + $3 bot funding each)
+const AGENT_MIN_USDC_STROOPS = BigInt(10_000_000); // 1 USDC floor
 
 let instance: AgentWallet | null = null;
 

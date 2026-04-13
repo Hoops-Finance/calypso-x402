@@ -1,10 +1,9 @@
 /**
- * planner.ts — turns a natural-language prompt (or structured hint) into a
- * validated (SessionConfig, BotConfig[]) pair. Called from POST /plan.
+ * planner.ts — turns a natural-language prompt into a validated
+ * (SessionConfig, BotConfig[]) pair. Called from POST /plan.
  *
- * Strategy: ask Gemma to emit a JSON object matching our schema, parse and
- * validate with zod, retry twice on failure, then fall back to a sane
- * default config so the user's $0.50 is never wasted on an LLM tantrum.
+ * Uses Gemini 2.5 Flash with responseMimeType: "application/json"
+ * for reliable structured output. Retries twice on parse failure.
  */
 
 import {
@@ -14,7 +13,7 @@ import {
   type BotConfig,
   type SessionConfig,
 } from "@calypso/shared";
-import { generate, allJsonCandidates, extractReasoning } from "./gemma.js";
+import { generate, allJsonCandidates } from "./gemma.js";
 import { ENV } from "../env.js";
 import { logger } from "../logger.js";
 
@@ -28,6 +27,7 @@ const PLANNER_PROMPT = `You are Calypso, a DeFi simulation planner. Given a user
 
 Output schema (match exactly):
 {
+  "reasoning": string (2-5 sentences explaining your design choices — what bots you picked and why, what intervals you chose, etc.),
   "session_config": {
     "name": string (max 100 chars),
     "duration_minutes": integer 1-180,
@@ -46,13 +46,14 @@ Output schema (match exactly):
 }
 
 RULES:
-- Return ONLY the JSON object. No prose, no markdown code fences.
+- Return ONLY the JSON object. No prose outside the JSON.
 - bot_id values must be unique.
 - If asked for "stress" or "volume" include at least 2 noise bots.
 - If asked for "arbitrage" or "spread" include at least 1 arbitrageur.
 - If the user names pools, target those. Otherwise default to ["soroswap:USDC/XLM"].
 - duration_minutes defaults to 5 if unspecified, 30 if "long", 3 if "demo" or "quick".
-- estimated_cost_usd = 2.00 (simulate) + 0.50 (plan) = 2.50 unless the user asks for /analyze too.
+- estimated_cost_usd = 0.05 (simulate) + 0.01 (plan) = 0.06 unless the user asks for /analyze too.
+- demo_mode should be false.
 
 User request:
 `;
@@ -96,7 +97,7 @@ function defaultPlan(): PlanResponse {
   return {
     session_config,
     bot_configs,
-    estimated_cost_usd: 2.5,
+    estimated_cost_usd: 0.06,
     target_pools: session_config.target_pools,
   };
 }
@@ -106,49 +107,53 @@ function buildUserMessage(req: PlanRequest): string {
   return `Structured request: ${JSON.stringify(req)}`;
 }
 
-const MODELS_TO_TRY = [
-  ENV.AI_MODEL,           // gemma-4-31b-it by default
-  "gemini-2.5-flash",     // reliable JSON fallback
-];
-
 export async function planFromRequest(req: PlanRequest): Promise<PlanResult> {
   const user = buildUserMessage(req);
   const prompt = PLANNER_PROMPT + user;
+  const model = ENV.AI_MODEL;
 
   let lastError: unknown = null;
-  for (const model of MODELS_TO_TRY) {
-    for (let attempt = 1; attempt <= 2; attempt++) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const raw = await generate(prompt, { temperature: 0.2, model });
+
+      // With Flash JSON mode, try direct parse first
+      let reasoning: string | null = null;
+      let parsed: PlanResponse | null = null;
+
       try {
-        const raw = await generate(prompt, { temperature: 0.2, model });
-        // Try every JSON candidate extractJson finds — the first one that
-        // passes the zod schema is the real plan, ignoring stray JSON
-        // fragments in Gemma's reasoning output.
+        const full = JSON.parse(raw.trim());
+        if (typeof full.reasoning === "string") {
+          reasoning = full.reasoning;
+        }
+        parsed = PlanResponseSchema.parse(full);
+      } catch {
+        // Fall back to candidate iteration
         const candidates = allJsonCandidates(raw);
-        let parsed: PlanResponse | null = null;
         for (const c of candidates) {
           try {
-            parsed = PlanResponseSchema.parse(JSON.parse(c));
+            const obj = JSON.parse(c);
+            if (typeof obj.reasoning === "string") reasoning = obj.reasoning;
+            parsed = PlanResponseSchema.parse(obj);
             break;
-          } catch {
-            // try next candidate
-          }
+          } catch { /* try next */ }
         }
-        if (!parsed) {
-          throw new Error(`no candidate matched PlanResponseSchema (${candidates.length} tried)`);
-        }
-        const reasoning = extractReasoning(raw);
-        logger.info({ model, attempt }, "planner: success");
-        return { plan: parsed, reasoning, model };
-      } catch (err) {
-        lastError = err;
-        logger.warn(
-          { model, attempt, err: err instanceof Error ? err.message : err },
-          "planner: attempt failed",
-        );
       }
+
+      if (!parsed) {
+        throw new Error(`no candidate matched PlanResponseSchema (attempt ${attempt})`);
+      }
+      logger.info({ model, attempt }, "planner: success");
+      return { plan: parsed, reasoning, model };
+    } catch (err) {
+      lastError = err;
+      logger.warn(
+        { model, attempt, err: err instanceof Error ? err.message : err },
+        "planner: attempt failed",
+      );
     }
   }
 
-  logger.error({ lastError }, "planner: all models/attempts failed, returning default plan");
+  logger.error({ lastError }, "planner: all attempts failed, returning default plan");
   return { plan: defaultPlan(), reasoning: null, model: "default" };
 }

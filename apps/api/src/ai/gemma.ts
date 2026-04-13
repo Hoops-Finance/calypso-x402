@@ -1,10 +1,9 @@
 /**
- * gemma.ts — tiny raw-fetch client for Gemma 4 via the Gemini API.
+ * gemma.ts — raw-fetch client for the Gemini API (Gemini 2.5 Flash primary).
  *
- * We do NOT use @google/generative-ai because it doesn't advertise
- * gemma-4-* models in its model picker and its structured-output mode
- * assumes Gemini-class features that Gemma doesn't expose. A tight raw
- * POST is 30 lines and gives us full control over retries and fallbacks.
+ * Uses responseMimeType: "application/json" so Flash returns clean JSON
+ * without prose or code fences. The allJsonCandidates extractor is kept
+ * as a safety net for edge cases.
  */
 
 import { logger } from "../logger.js";
@@ -12,33 +11,35 @@ import { ENV } from "../env.js";
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
-export interface GemmaOptions {
-  /** Override the default model (e.g. fallback to gemini-2.0-flash). */
+export interface GeminiOptions {
   model?: string;
-  /** Sampling temperature; lower = more deterministic JSON output. */
   temperature?: number;
-  /** Optional abort signal. */
   signal?: AbortSignal;
+  /** When true, sets responseMimeType to application/json. Default true for Flash models. */
+  jsonMode?: boolean;
 }
 
-/**
- * Sends a single-turn text prompt and returns the raw model response.
- * Throws on HTTP errors so the caller can decide retry strategy.
- */
-export async function generate(prompt: string, opts: GemmaOptions = {}): Promise<string> {
+export async function generate(prompt: string, opts: GeminiOptions = {}): Promise<string> {
   if (!ENV.GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY not set — /plan and AI reviewer disabled");
   }
   const model = opts.model ?? ENV.AI_MODEL;
   const url = `${BASE}/${model}:generateContent?key=${encodeURIComponent(ENV.GEMINI_API_KEY)}`;
 
+  const useJsonMode = opts.jsonMode !== false && model.startsWith("gemini-");
+
+  const generationConfig: Record<string, unknown> = {
+    temperature: opts.temperature ?? 0.2,
+    topP: 0.95,
+    maxOutputTokens: 4096,
+  };
+  if (useJsonMode) {
+    generationConfig.responseMimeType = "application/json";
+  }
+
   const body = {
     contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: opts.temperature ?? 0.2,
-      topP: 0.95,
-      maxOutputTokens: 2048,
-    },
+    generationConfig,
   };
 
   const res = await fetch(url, {
@@ -50,8 +51,8 @@ export async function generate(prompt: string, opts: GemmaOptions = {}): Promise
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    logger.error({ status: res.status, model, errText: errText.slice(0, 500) }, "gemma http error");
-    throw new Error(`gemma http ${res.status}: ${errText.slice(0, 200)}`);
+    logger.error({ status: res.status, model, errText: errText.slice(0, 500) }, "ai http error");
+    throw new Error(`ai http ${res.status}: ${errText.slice(0, 200)}`);
   }
 
   const data = (await res.json()) as {
@@ -61,9 +62,6 @@ export async function generate(prompt: string, opts: GemmaOptions = {}): Promise
   return text;
 }
 
-/**
- * Strip markdown code fences the model likes to add even when told not to.
- */
 export function stripFences(s: string): string {
   return s
     .replace(/^```(?:json)?\s*/i, "")
@@ -72,56 +70,53 @@ export function stripFences(s: string): string {
 }
 
 /**
- * Gemma 4 enters chain-of-thought reasoning mode regardless of prompt
- * instructions, producing `*   ` bullet-style reasoning THEN the
- * actual JSON payload. We try multiple extraction strategies and
- * return the first one that actually parses as valid JSON. The full
- * raw text (including reasoning) is available separately for UI display.
+ * Extract the first valid JSON from the model output. With Flash in JSON
+ * mode the output should parse directly, but this handles edge cases.
  */
 export function extractJson(raw: string): string {
+  // Direct parse first (Flash JSON mode)
+  try {
+    JSON.parse(raw);
+    return raw.trim();
+  } catch { /* fall through */ }
+
   const candidates: string[] = [];
 
-  // Strategy 1: ```json code fence (most reliable for Gemma)
   const fenceMatch = raw.match(/```json\s*\n?([\s\S]*?)```/i);
   if (fenceMatch?.[1]) candidates.push(fenceMatch[1].trim());
 
-  // Strategy 2: find ALL balanced { ... } blocks, pick the longest valid one.
-  // Gemma's reasoning contains stray braces, so the single-reverse-scan
-  // approach sometimes picks an inner array. Scanning all candidates and
-  // picking the longest avoids that.
   const allObjects = findAllBalanced(raw, "{", "}");
-  // Sort longest first — the full plan object is always bigger than any
-  // fragment the reasoning might contain.
   allObjects.sort((a, b) => b.length - a.length);
   candidates.push(...allObjects);
 
-  // Strategy 3: reverse-scan for last balanced [ ... ]
   const fromBracket = reverseExtract(raw, "[", "]");
   if (fromBracket) candidates.push(fromBracket);
 
-  // Strategy 4: plain stripFences
   candidates.push(stripFences(raw));
 
-  // Return the first candidate that parses as valid JSON
   for (const c of candidates) {
     try {
       JSON.parse(c);
       return c;
-    } catch {
-      // try next
-    }
+    } catch { /* try next */ }
   }
 
   return candidates[0] ?? stripFences(raw);
 }
 
 /**
- * Returns all parseable JSON candidates from Gemma's output, ordered
- * from most likely (fence > longest object > array > stripped).
- * Callers that need schema validation can iterate until one fits.
+ * Returns all parseable JSON candidates from model output. With Flash
+ * in JSON mode there's usually just one (the raw output). Kept as
+ * safety net for schema-aware iteration by callers.
  */
 export function allJsonCandidates(raw: string): string[] {
   const out: string[] = [];
+
+  // Flash JSON mode: the entire output is usually valid JSON
+  try {
+    JSON.parse(raw.trim());
+    out.push(raw.trim());
+  } catch { /* fall through */ }
 
   const fenceMatch = raw.match(/```json\s*\n?([\s\S]*?)```/i);
   if (fenceMatch?.[1]) out.push(fenceMatch[1].trim());
@@ -135,7 +130,6 @@ export function allJsonCandidates(raw: string): string[] {
 
   out.push(stripFences(raw));
 
-  // Deduplicate and filter to parseable JSON
   const seen = new Set<string>();
   const valid: string[] = [];
   for (const c of out) {
@@ -144,16 +138,13 @@ export function allJsonCandidates(raw: string): string[] {
     try {
       JSON.parse(c);
       valid.push(c);
-    } catch {
-      // skip unparseable
-    }
+    } catch { /* skip unparseable */ }
   }
   return valid;
 }
 
 function findAllBalanced(s: string, opener: string, closer: string): string[] {
   const results: string[] = [];
-  // Walk forward looking for each opener and find its balanced closer
   for (let start = 0; start < s.length; start++) {
     if (s[start] !== opener) continue;
     let depth = 0;
@@ -179,17 +170,24 @@ function findAllBalanced(s: string, opener: string, closer: string): string[] {
 }
 
 /**
- * Extracts Gemma's reasoning preamble (everything before the JSON)
- * so the UI can display it. Returns null if no reasoning found.
+ * Extracts reasoning from the model output. With Flash in JSON mode,
+ * reasoning is returned as a field inside the JSON itself (if prompted
+ * to include it). Returns the reasoning field value if present.
  */
 export function extractReasoning(raw: string): string | null {
-  // Find where the JSON starts — everything before it is reasoning
+  try {
+    const parsed = JSON.parse(raw.trim());
+    if (parsed && typeof parsed === "object" && typeof parsed.reasoning === "string" && parsed.reasoning.length > 10) {
+      return parsed.reasoning;
+    }
+  } catch { /* not JSON or no reasoning field */ }
+
+  // Fallback: look for reasoning before JSON block
   const fenceMatch = raw.match(/```json\s*\n?/i);
   if (fenceMatch?.index != null && fenceMatch.index > 20) {
     return raw.slice(0, fenceMatch.index).trim();
   }
 
-  // Find the start of the extracted JSON
   const json = extractJson(raw);
   const jsonStart = raw.indexOf(json);
   if (jsonStart > 20) {

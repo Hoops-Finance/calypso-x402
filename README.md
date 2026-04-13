@@ -5,12 +5,12 @@
 > Agents don't just buy data anymore — they buy entire market environments.
 
 Calypso Swarm turns DeFi market simulation into a **pay-per-call API** on
-Stellar. Two gated endpoints — `POST /plan` ($0.50) and `POST /simulate`
-($2.00) — are settled via [x402](https://x402.org) USDC micropayments. An
+Stellar. Two gated endpoints — `POST /plan` ($0.01) and `POST /simulate`
+($0.05) — are settled via [x402](https://x402.org) USDC micropayments. An
 **autonomous Calypso Agent** pays both calls with its own Ed25519 keypair,
 spawns a swarm of rule-based bot wallets (arbitrageur / noise / lp manager),
 and trades real paths through the **Hoops router** across Soroswap, Phoenix,
-Comet, and Aquarius on testnet. A **Gemma 4** orchestrator reviews the
+and Aqua on testnet. A **Gemini Flash** orchestrator reviews the
 aggregated metrics every five minutes and retunes the bot parameters live.
 
 The architectural hook: **the product is the API, not the UI.** The Calypso
@@ -46,16 +46,16 @@ Built for **Stellar Hacks: Agents (x402 + Stripe MPP)** on DoraHacks.
 2. **The Calypso Agent fires `POST /plan`** via `@x402/fetch`. The server
    returns `HTTP 402 Payment Required` with a Stellar USDC price. The agent
    signs a Soroban auth entry with its Ed25519 keypair, retries, and the
-   **in-process facilitator** settles the payment on-chain. Gemma 4 turns
+   **in-process facilitator** settles the payment on-chain. Gemini Flash turns
    the brief into a structured `SessionConfig` and bot recipe.
-3. **The agent fires `POST /simulate`** — same handshake, $2.00 instead of
-   $0.50. Calypso creates a session record and hands the session ID back.
+3. **The agent fires `POST /simulate`** — same handshake, $0.05 instead of
+   $0.01. Calypso creates a session record and hands the session ID back.
 4. **The agent spawns the bot swarm** — for each bot config, generate an
    Ed25519 keypair, friendbot-fund it, deploy a per-bot Hoops smart account,
    transfer XLM + USDC from the agent wallet to the smart account, and start
    the chassis loop. Every swap routes through the Hoops router.
-5. **Gemma 4 reviews every five minutes.** The aggregator walks the session
-   log, the reviewer asks Gemma for parameter deltas, zod validates, clamps
+5. **Gemini Flash reviews every five minutes.** The aggregator walks the session
+   log, the reviewer asks Gemini for parameter deltas, zod validates, clamps
    apply, and the live config store updates.
 6. **`/sessions/:id` tails it in real time** via SSE. The UI shows two real
    on-chain tx hashes (plan + simulate payments), a visceral three-tier
@@ -64,7 +64,7 @@ Built for **Stellar Hacks: Agents (x402 + Stripe MPP)** on DoraHacks.
 
 Every step above is visible in the demo video: agent pays x402 twice on
 camera with the tx hashes stamped as receipts, bot smart accounts appear on
-stellar.expert, swaps fire, Gemma adjusts, STOP drains back.
+stellar.expert, swaps fire, Gemini adjusts, STOP drains back.
 
 ---
 
@@ -117,9 +117,9 @@ Four parties, one process, one facilitator. The UI never signs anything.
             ▼
  ┌─────────────────────────┐
  │  Calypso Agent          │   Ed25519 G-account · autonomous x402 payer
- │  apps/api/src/agent/    │   · pays  /plan     $0.50
- │                         │   · pays  /simulate $2.00
- │                         │   · pays  /analyze  $0.50
+ │  apps/api/src/agent/    │   · pays  /plan     $0.01
+ │                         │   · pays  /simulate $0.05
+ │                         │   · pays  /analyze  $0.01
  │                         │   · signs every payment itself
  │                         │   · calls the API over real localhost HTTP
  └──────────┬──────────────┘
@@ -137,7 +137,7 @@ Four parties, one process, one facilitator. The UI never signs anything.
  │  Calypso Orchestrator   │      │  API Revenue wallet      │
  │  Session / Launcher     │      │  (pure x402 sink)        │
  │  Aggregator / Config    │      │  receives every USDC pay │
- │  Gemma 4 Reviewer       │      └─────────────────────────┘
+ │  Gemini Flash Reviewer       │      └─────────────────────────┘
  └──────────┬──────────────┘
             │ agent-signed XLM + USDC transfers from the agent G-account
             ▼
@@ -148,7 +148,7 @@ Four parties, one process, one facilitator. The UI never signs anything.
  │  account funded by the agent                    │
  └──────────┬──────────────────────────────────────┘
             ▼
-    Hoops router → Soroswap / Phoenix / Aqua / Comet
+    Hoops router → Soroswap / Phoenix / Aqua
 
  ┌─────────────────────────┐
  │  Next.js 16 UI (:3000)  │   pure harness · talks to /agent/* only
@@ -186,6 +186,8 @@ Two things to flag in the diagram:
 
 ```
 hoops_calypso-x402/                 pnpm workspaces monorepo
+├── data/
+│   └── sessions/                   bot keypair keystore (crash recovery)
 ├── apps/
 │   ├── api/                        Express + x402 + agent + orchestrator + bots
 │   │   ├── src/
@@ -207,7 +209,7 @@ hoops_calypso-x402/                 pnpm workspaces monorepo
 │   │   │   ├── bots/               chassis + arbitrageur / noise / lp archetypes
 │   │   │   ├── router/             Hoops router wrapper
 │   │   │   ├── aggregator/         bot logs → Metrics
-│   │   │   ├── ai/                 Gemma 4 planner + reviewer
+│   │   │   ├── ai/                 Gemini 2.5 Flash planner + reviewer
 │   │   │   └── constants.ts        addresses from hoops-sdk-types
 │   │   └── scripts/                bootstrap, smoke scripts
 │   └── web/                        Next.js 16 UI — pure harness
@@ -251,9 +253,9 @@ Packages are consumed via `file:` workspace links pinned with pnpm overrides.
 ### What Calypso built fresh
 
 Everything new to the Hoops ecosystem: the x402 wiring, the bot chassis +
-archetypes, the Session/Launcher/Aggregator orchestrator, the Gemma 4
+archetypes, the Session/Launcher/Aggregator orchestrator, the Gemini Flash
 planner + reviewer loop, the Next.js 16 UI, and the wallet factory that
-per-session ephemeral smart accounts. These are the first Gemini/Gemma
+per-session ephemeral smart accounts. These are the first Gemini
 tool-calling and x402-on-Stellar code in the repo family.
 
 ---
@@ -374,7 +376,7 @@ point into Calypso functionality.
 All three are gated by `@x402/express`'s `paymentMiddlewareFromConfig`
 against the local in-process facilitator.
 
-### `POST /plan` — `$0.50`
+### `POST /plan` — `$0.01`
 
 ```jsonc
 // in
@@ -383,16 +385,16 @@ against the local in-process facilitator.
 {
   "session_config": { "name": "...", "duration_minutes": 5, "target_pools": ["soroswap:USDC/XLM"], "initial_treasury_xlm": 10000, "demo_mode": false },
   "bot_configs": [ { "archetype": "noise", "bot_id": "noise-1", ... }, ... ],
-  "estimated_cost_usd": 2.5,
+  "estimated_cost_usd": 0.06,
   "target_pools": ["soroswap:USDC/XLM"]
 }
 ```
 
-Gemma 4 is asked for a strict JSON object matching `PlanResponseSchema`.
+Gemini Flash is asked for a strict JSON object matching `PlanResponseSchema`.
 Parse failures retry twice before falling back to a hand-coded default
-plan — the user's $0.50 is never wasted.
+plan — the user's $0.01 is never wasted.
 
-### `POST /simulate` — `$2.00`
+### `POST /simulate` — `$0.05`
 
 ```jsonc
 // in: the output of /plan (or a manually-constructed equivalent)
@@ -405,7 +407,7 @@ Creates a Session, spawns bot wallets in parallel (friendbot → deploy
 smart account), starts the chassis loops, and schedules an auto-end
 based on `duration_minutes`.
 
-### `POST /analyze` — `$0.50`
+### `POST /analyze` — `$0.01`
 
 ```jsonc
 // in
@@ -458,12 +460,12 @@ extending the router, not every bot.
 ## Safety bounds
 
 - **Rate limits:** 10 requests/minute/IP on `/plan`, 5 requests/minute/IP
-  on `/simulate`. Protects our Gemma quota and testnet from abuse.
+  on `/simulate`. Protects our Gemini quota and testnet from abuse.
 - **AI delta clamps:** the config store clamps every numeric delta from
   the reviewer. `interval_seconds` must stay in `[5, 300]`, `max_amount`
   and `max_position_size` are capped at 100 XLM, `min_spread_bps` at
   1000, `rebalance_threshold` at `[0, 1]`. Clamps are logged.
-- **Parse failure pause:** if Gemma returns unparseable JSON 3 times in
+- **Parse failure pause:** if Gemini returns unparseable JSON 3 times in
   a row for the same session, the reviewer pauses for that session until
   restart. Malformed LLM output never corrupts a live config.
 - **Session circuit breaker:** 25 errors in a session aborts all bots
@@ -474,18 +476,28 @@ extending the router, not every bot.
 - **Missing `GEMINI_API_KEY`:** the reviewer logs a one-time warning
   and skips gracefully. The server runs fine without AI — the UI just
   won't show an "ai adjustments" rail.
+- **Auto-end teardown:** when a session's `duration_minutes` expires,
+  bots stop and all funds (USDC + XLM) drain back to the agent
+  automatically. The circuit breaker (25 errors) also triggers
+  teardown. Manual stop via `POST /agent/stop/:id` does the same.
+- **Crash recovery (bot keystore):** bot keypairs are persisted to
+  `data/sessions/{id}.json` the moment bots are created. If the
+  server crashes mid-session, the next startup detects leftover
+  keystore files, rebuilds bot wallets from stored secrets, runs
+  teardown to drain funds back to the agent, and deletes the file.
+  No exit path leaves funds stranded in bot accounts.
 
 ---
 
 ## Known limitations
 
-- **Soroswap-only execution:** the router wrapper currently routes all
-  swaps through Soroswap via `HoopsSession.swapXlmToUsdc`, even when
-  quotes show a better price on Comet or Phoenix. The Comet and Phoenix
-  adapters trip a Soroban auth recording issue when invoked via the
-  shared smart account wrapper — the fix lives in `hoops_sdk`'s smart
-  account contract, not here. We still fetch multi-DEX quotes at every
-  tick, so the arbitrageur still sees and reports cross-DEX spread.
+- **Soroswap-only execution:** the router quotes Soroswap, Aqua, and
+  Phoenix on every tick, and attempts to swap through the best-priced
+  adapter. Non-Soroswap adapters currently fail at the Soroban auth
+  recording step in the smart account contract, so execution falls back
+  to Soroswap. The SDK now supports generic `swap(poolAddress)` — the
+  blocker is the on-chain contract, not the TypeScript layer. Multi-DEX
+  spread is still detected and logged by the arbitrageur.
 - **Local-only facilitator:** the hosted `x402.org/facilitator` has
   `maxTransactionFeeStroops = 50 000`, which rejects Soroban contract
   settles because resource fees routinely exceed that. Calypso runs a
@@ -493,9 +505,10 @@ extending the router, not every bot.
   `stellar/x402-stellar` self-hosted pattern) with a 5 000 000 stroop
   ceiling. Pointing at the hosted facilitator fails fast with
   `invalid_exact_stellar_payload_fee_exceeds_maximum`.
-- **No persistence:** sessions live in memory. Restarting the API
-  wipes all session state. Durability is on the roadmap; for a 48-hour
-  hackathon build it's out of scope.
+- **Session state in memory:** session logs and metrics live in memory.
+  Restarting the API wipes session history. However, bot keypairs are
+  persisted to disk (`data/sessions/`) so stranded funds are always
+  recoverable on restart. Full session durability is on the roadmap.
 - **Testnet only:** all funding is via friendbot. Mainnet mode would
   require a real USDC on-ramp and a user-deposit treasury; the
   architecture supports it but the demo runs on free testnet XLM.
@@ -550,8 +563,8 @@ DeFi market simulation into a pay-per-call capability. Every call is
 settled on-chain via x402."
 
 **00:15 · Show the published prices.**
-Point at the right-rail pricing card — POST `/plan` $0.50, POST `/simulate`
-$2.00, POST `/analyze` $0.50. Say: "Three gated endpoints. An autonomous
+Point at the right-rail pricing card — POST `/plan` $0.01, POST `/simulate`
+$0.05, POST `/analyze` $0.01. Say: "Three gated endpoints. An autonomous
 Calypso Agent pays all three."
 
 **00:25 · Walk into /wallets.**
@@ -572,8 +585,8 @@ The X402Ceremony modal opens with a dispatch spinner: *"Agent is calling
 
 **01:10 · The hero frame.**
 Modal flips to SETTLED. The big red PAID stamp slaps onto the screen.
-Two trace cards show **real tx hashes**: `/plan` $0.50 and `/simulate`
-$2.00. Click one — it opens stellar.expert with the real Soroban contract
+Two trace cards show **real tx hashes**: `/plan` $0.01 and `/simulate`
+$0.05. Click one — it opens stellar.expert with the real Soroban contract
 call. Narrate: "Both payments settled through an in-process x402
 facilitator. The agent pays itself, I never signed anything."
 
@@ -587,7 +600,7 @@ just funded three bot smart accounts with USDC."
 Point at the live log — SSE-streamed swap actions, tx hashes, pool
 interactions. Click one bot's row to filter the log. Show the AI
 adjustments rail. Narrate: "Real Soroswap swaps through the Hoops router,
-every five minutes Gemma 4 reviews and retunes."
+every five minutes Gemini Flash reviews and retunes."
 
 **02:10 · Stop.**
 Click **STOP SESSION**. Confirm in the modal. Drain happens — the modal
@@ -607,7 +620,7 @@ is infrastructure autonomous agents can pay to think."*
 
 The whole flow touches: local x402 facilitator, real Stellar testnet tx
 settlement, Soroban contract calls, Ed25519 auth, the Hoops router,
-rule-based chassis, and the Gemma 4 reviewer. Everything you'd expect
+rule-based chassis, and the Gemini Flash reviewer. Everything you'd expect
 from a Stellar Agents x402 + MPP submission except MPP itself.
 
 ---

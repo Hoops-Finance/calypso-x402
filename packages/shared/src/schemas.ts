@@ -33,14 +33,14 @@ export const ArbitrageurConfigSchema = z.object({
   max_position_size: z.number().positive(),
   target_pairs: z.array(TokenPairSchema).min(1),
   target_dexes: z.array(DexIdSchema).min(1),
-  interval_seconds: z.number().int().min(1).max(300).default(15),
+  interval_seconds: z.number().int().min(5).max(300).default(15),
 });
 export type ArbitrageurConfig = z.infer<typeof ArbitrageurConfigSchema>;
 
 export const NoiseConfigSchema = z.object({
   archetype: z.literal("noise"),
   bot_id: z.string(),
-  interval_seconds: z.number().int().min(1).max(300),
+  interval_seconds: z.number().int().min(5).max(300),
   min_amount: z.number().positive(),
   max_amount: z.number().positive(),
   target_pools: z.array(PoolRefSchema).min(1),
@@ -229,6 +229,7 @@ export const SessionSummarySchema = z.object({
   name: z.string(),
   status: SessionStatusSchema,
   started_at: z.string(),
+  bot_count: z.number(),
   pnl_summary: z.object({
     gross_volume_usd: z.number(),
     net_pnl_usd: z.number(),

@@ -30,10 +30,10 @@ export function NavBar() {
             </div>
             <div className="flex flex-col leading-none">
               <span className="font-display text-lg font-semibold text-paper tracking-tight">
-                Calypso<span className="text-primary">/</span>Swarm
+                Calypso
               </span>
               <span className="font-mono text-[9px] uppercase tracking-[0.24em] text-muted-foreground mt-1">
-                stellar market simulation · x402
+                agent-paid bot swarms · x402
               </span>
             </div>
           </Link>
@@ -43,6 +43,7 @@ export function NavBar() {
             <NavLink href="/simulate">simulate</NavLink>
             <NavLink href="/sessions">sessions</NavLink>
             <NavLink href="/wallets">wallets</NavLink>
+            <NavLink href="/docs">docs</NavLink>
           </nav>
         </div>
 

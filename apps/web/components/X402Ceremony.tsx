@@ -277,8 +277,8 @@ function SettledBody({
 
       {/* Trace cards — plan trace is null for direct launches */}
       <div className={`grid grid-cols-1 ${planTrace ? "md:grid-cols-2" : ""} gap-4`}>
-        {planTrace && <TraceCard label="PLAN · $0.50" trace={planTrace} />}
-        <TraceCard label="SIMULATE · $2.00" trace={simulateTrace} />
+        {planTrace && <TraceCard label="PLAN · $0.01" trace={planTrace} />}
+        <TraceCard label="SIMULATE · $0.05" trace={simulateTrace} />
       </div>
 
       {/* Session hint + continue */}

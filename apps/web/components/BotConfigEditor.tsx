@@ -26,7 +26,7 @@ const ARCHETYPES: Record<BotConfig["archetype"], ArchetypeMeta> = {
     title: "Arbitrageur",
     tagline: "Spread hunter across DEXes",
     description:
-      "Queries Hoops for a price on every adapter (Soroswap, Phoenix, Aqua, Comet) and executes a swap when the spread between best and worst exceeds the threshold. Logs the observed spread on every tick even when it skips, so the AI reviewer can see why the bot is quiet.",
+      "Queries Hoops for a price on every adapter (Soroswap, Phoenix, Aqua) and executes a swap when the spread between best and worst exceeds the threshold. Logs the observed spread on every tick even when it skips, so the AI reviewer can see why the bot is quiet.",
   },
   noise: {
     title: "Noise Trader",

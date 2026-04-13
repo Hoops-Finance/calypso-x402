@@ -21,6 +21,22 @@ import type {
   SessionSummary,
 } from "@calypso/shared";
 import type { BotWallet } from "./wallets.js";
+import { logger } from "../logger.js";
+
+export interface SessionTrace {
+  path: string;
+  method: "POST";
+  payer: string;
+  payee: string;
+  amount: string | null;
+  amount_usd: string | null;
+  asset: string | null;
+  network: string;
+  payment_required_raw: string | null;
+  payment_required_decoded: unknown;
+  payment_tx_hash: string | null;
+  settled_at: string;
+}
 
 export interface Session {
   id: string;
@@ -33,6 +49,8 @@ export interface Session {
   bots: BotWallet[];
   botLogs: BotLogEntry[];
   aiFeedback: AIFeedbackEntry[];
+  planTrace?: SessionTrace;
+  simulateTrace?: SessionTrace;
   controller: AbortController;
   /** Event emitter queue for SSE subscribers. Each subscriber gets its own callback. */
   subscribers: Set<(evt: SessionEvent) => void>;
@@ -81,6 +99,7 @@ export function listSessions(): SessionSummary[] {
     name: s.name,
     status: s.status,
     started_at: s.startedAt,
+    bot_count: s.botConfigs.length,
     pnl_summary: {
       gross_volume_usd: s.botLogs.reduce((acc, l) => acc + (l.amount_in ?? 0), 0),
       net_pnl_usd: 0, // computed on demand by aggregator for /report
@@ -110,6 +129,15 @@ export function appendBotLog(session: Session, entry: BotLogEntry): void {
       session.status = "failed";
       publish(session, { type: "status", status: "failed" });
       session.controller.abort();
+      // Drain bot funds back to agent even on failure
+      void Promise.allSettled(session.botTasks).then(async () => {
+        const { teardownSession } = await import("./teardown.js");
+        return teardownSession(session);
+      }).then((td) => {
+        logger.info({ sessionId: session.id, xlm: td.recovered.xlm, usdc: td.recovered.usdc }, "circuit-breaker: bot funds returned to agent");
+      }).catch((err) => {
+        logger.error({ err, sessionId: session.id }, "circuit-breaker: teardown failed");
+      });
     }
   }
 }

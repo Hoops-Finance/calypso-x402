@@ -5,9 +5,9 @@
  *
  *   1. CALYPSO API (service 1)
  *      x402-gated endpoints — this is the product.
- *        POST /plan      $0.50
- *        POST /simulate  $2.00
- *        POST /analyze   $0.50
+ *        POST /plan      $0.01
+ *        POST /simulate  $0.05
+ *        POST /analyze   $0.01
  *      Plus free read endpoints:
  *        GET  /health
  *        GET  /wallets/platform  (API revenue wallet state)
@@ -66,6 +66,7 @@ import { startReviewerLoop } from "../ai/reviewer.js";
 import { listSessions as sessionList, getSession } from "../orchestrator/session.js";
 import { PlatformWallet } from "../orchestrator/platformWallet.js";
 import { AgentWallet } from "../orchestrator/agentWallet.js";
+import { recoverStrandedSessions } from "../orchestrator/botKeystore.js";
 
 async function bootstrap(): Promise<void> {
   const app = express();
@@ -148,6 +149,7 @@ async function bootstrap(): Promise<void> {
     .catch((err) => logger.error({ err }, "platformWallet: initial boot failed"));
   void AgentWallet.get()
     .ensureInitialized()
+    .then(() => recoverStrandedSessions())
     .catch((err) => logger.error({ err }, "agentWallet: initial boot failed"));
 }
 

@@ -9,7 +9,7 @@
  *   - FlowDiagram: three-tier money flow + live bot balances + revenue side rail.
  *   - Bot table: per-bot metrics + filter pills.
  *   - Live log tape: SSE-streamed bot actions, filtered by selected bot.
- *   - AI rail: Gemma 4 adjustments.
+ *   - AI rail: Gemini Flash adjustments.
  *   - x402 receipt: the agent's original plan + simulate payment trace,
  *     captured at launch time into sessionStorage so the session page
  *     can re-render the on-chain tx hashes.
@@ -81,6 +81,14 @@ export default function SessionDetail(props: { params: Promise<{ id: string }> }
         if (!alive) return;
         setReport(r);
         setStatus(r.status);
+        // Fallback: if sessionStorage has no traces but the API report does, use those
+        if (!traces && (r.plan_trace || r.simulate_trace)) {
+          setTraces({
+            plan: r.plan_trace ?? null,
+            simulate: r.simulate_trace ?? null,
+            total_usd: r.plan_trace ? "$0.06" : "$0.05",
+          });
+        }
       } catch (err) {
         if (!alive) return;
         setError(err instanceof Error ? err.message : String(err));
@@ -92,7 +100,7 @@ export default function SessionDetail(props: { params: Promise<{ id: string }> }
       alive = false;
       clearInterval(interval);
     };
-  }, [id]);
+  }, [id, traces]);
 
   useEffect(() => {
     const es = openAgentEventStream(id);
@@ -252,8 +260,8 @@ export default function SessionDetail(props: { params: Promise<{ id: string }> }
         <section className="mt-10">
           <SectionHeader index="A" label="x402 handshake" sub={traces.plan ? "two on-chain settlements" : "one on-chain settlement"} />
           <div className={`grid grid-cols-1 ${traces.plan ? "md:grid-cols-[1fr_1fr_auto]" : "md:grid-cols-[1fr_auto]"} gap-4 items-start`}>
-            {traces.plan && <TraceCard label="PLAN · $0.50" trace={traces.plan} />}
-            {traces.simulate && <TraceCard label="SIMULATE · $2.00" trace={traces.simulate} />}
+            {traces.plan && <TraceCard label="PLAN · $0.01" trace={traces.plan} />}
+            {traces.simulate && <TraceCard label="SIMULATE · $0.05" trace={traces.simulate} />}
             <div className="flex items-start justify-end">
               <PaymentStamp amountUsd={traces.total_usd} compact />
             </div>
@@ -261,7 +269,7 @@ export default function SessionDetail(props: { params: Promise<{ id: string }> }
           {traces.ai_reasoning && (
             <details className="mt-4 border border-primary/30 bg-primary/5 corner-marks">
               <summary className="px-5 py-3 cursor-pointer font-mono text-[10px] uppercase tracking-[0.22em] text-primary hover:text-foreground">
-                gemma 4 reasoning · model: {traces.ai_model ?? "?"}
+                gemini flash reasoning · model: {traces.ai_model ?? "?"}
               </summary>
               <pre className="px-5 pb-4 text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap max-h-[400px] overflow-y-auto font-mono">
                 {traces.ai_reasoning}
@@ -402,13 +410,13 @@ export default function SessionDetail(props: { params: Promise<{ id: string }> }
                 ai adjustments
               </div>
               <div className="font-mono text-[9px] uppercase tracking-[0.18em] px-2 py-0.5 border border-primary/30 text-primary bg-primary/5">
-                gemma 4
+                gemini flash
               </div>
             </div>
             <div className="p-5">
               {allFeedback.length === 0 ? (
                 <div className="text-[11px] text-muted-foreground leading-relaxed">
-                  Gemma hasn&apos;t reviewed yet. First review fires within the next interval.
+                  AI hasn&apos;t reviewed yet. First review fires within the next interval.
                 </div>
               ) : (
                 <div className="space-y-4">

@@ -9,8 +9,8 @@
  * keeps the x402 handshake working against the agent we control.
  *
  * USDC amounts are specified in stroops (7 decimals):
- *   $0.50 = 5_000_000 stroops
- *   $2.00 = 20_000_000 stroops
+ *   $0.01 = 100_000 stroops
+ *   $0.05 = 500_000 stroops
  */
 
 import { paymentMiddlewareFromConfig } from "@x402/express";
@@ -28,7 +28,7 @@ const routes = {
   "POST /plan": {
     accepts: {
       scheme: "exact",
-      price: { asset: HOOPS_USDC_ASSET, amount: "5000000" }, // 0.5 USDC
+      price: { asset: HOOPS_USDC_ASSET, amount: "100000" }, // $0.01 USDC
       network,
       payTo: ENV.PAY_TO,
     },
@@ -37,7 +37,7 @@ const routes = {
   "POST /simulate": {
     accepts: {
       scheme: "exact",
-      price: { asset: HOOPS_USDC_ASSET, amount: "20000000" }, // 2.0 USDC
+      price: { asset: HOOPS_USDC_ASSET, amount: "500000" }, // $0.05 USDC
       network,
       payTo: ENV.PAY_TO,
     },
@@ -46,7 +46,7 @@ const routes = {
   "POST /analyze": {
     accepts: {
       scheme: "exact",
-      price: { asset: HOOPS_USDC_ASSET, amount: "5000000" }, // 0.5 USDC
+      price: { asset: HOOPS_USDC_ASSET, amount: "100000" }, // $0.01 USDC
       network,
       payTo: ENV.PAY_TO,
     },

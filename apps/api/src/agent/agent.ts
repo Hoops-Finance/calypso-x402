@@ -49,6 +49,7 @@ import { AgentWallet } from "../orchestrator/agentWallet.js";
 import { createSession, getSession, listSessions, endSession, setStatus, type Session } from "../orchestrator/session.js";
 import { launchSession } from "../orchestrator/launcher.js";
 import { teardownSession, type TeardownResult } from "../orchestrator/teardown.js";
+import { clearSessionKeys } from "../orchestrator/botKeystore.js";
 import { summarize } from "../aggregator/summarize.js";
 import { logger } from "../logger.js";
 
@@ -249,8 +250,8 @@ export class Agent {
 
   /**
    * End-to-end simulation workflow:
-   *   1. Pay for a plan (x402 $0.50)
-   *   2. Pay for a simulation (x402 $2.00)
+   *   1. Pay for a plan (x402 $0.01)
+   *   2. Pay for a simulation (x402 $0.05)
    *   3. Create a local session record
    *   4. Spawn bot wallets, fund them from agent
    *   5. Start bot loops
@@ -271,11 +272,11 @@ export class Agent {
     emit({ step: "info", message: `Agent wallet: ${this.wallet.publicKey.slice(0, 8)}…`, t: Date.now() });
     emit({ step: "info", message: `Prompt: "${prompt.slice(0, 80)}${prompt.length > 80 ? "…" : ""}"`, t: Date.now() });
     emit({ step: "plan_start", message: `POST http://127.0.0.1:${ENV.API_PORT}/plan`, t: Date.now() });
-    emit({ step: "info", message: `→ Server returns HTTP 402 Payment Required ($0.50 USDC)`, t: Date.now() });
+    emit({ step: "info", message: `→ Server returns HTTP 402 Payment Required ($0.01 USDC)`, t: Date.now() });
     emit({ step: "info", message: `→ @x402/fetch signs Soroban auth entry with agent Ed25519 keypair`, t: Date.now() });
     emit({ step: "info", message: `→ Retrying POST /plan with X-PAYMENT header attached`, t: Date.now() });
     emit({ step: "info", message: `→ Facilitator verifies payment + submits USDC transfer on-chain`, t: Date.now() });
-    emit({ step: "info", message: `→ Gemma 4 generating session plan (10-30s)…`, t: Date.now() });
+    emit({ step: "info", message: `→ Gemini Flash generating session plan…`, t: Date.now() });
 
     const { plan, trace: planTrace } = await this.payForPlan({ prompt });
     const aiReasoning = (plan as Record<string, unknown>)._ai as
@@ -294,7 +295,7 @@ export class Agent {
     const model = aiReasoning?.model ?? "default";
     emit({ step: "info", message: `AI model: ${model}`, t: Date.now() });
 
-    // Show Gemma reasoning if available
+    // Show AI reasoning if available
     if (aiReasoning?.reasoning) {
       const reasoningLines = aiReasoning.reasoning.split("\n").filter((l: string) => l.trim());
       for (const line of reasoningLines.slice(0, 12)) {
@@ -313,7 +314,7 @@ export class Agent {
 
     // ─── STEP 2: /simulate x402 handshake ───
     emit({ step: "simulate_start", message: `POST http://127.0.0.1:${ENV.API_PORT}/simulate`, t: Date.now() });
-    emit({ step: "info", message: `→ HTTP 402 → sign → retry → facilitator settles $2.00 USDC`, t: Date.now() });
+    emit({ step: "info", message: `→ HTTP 402 → sign → retry → facilitator settles $0.05 USDC`, t: Date.now() });
 
     const { result: simulateResult, trace: simulateTrace } = await this.payForSimulate({
       session_config: plan.session_config,
@@ -336,6 +337,9 @@ export class Agent {
       );
     }
 
+    session.planTrace = planTrace;
+    session.simulateTrace = simulateTrace;
+
     // ─── STEP 3: bot deployment ───
     emit({ step: "launching", message: `Spawning ${plan.bot_configs.length} bot wallets (friendbot + smart account + USDC)…`, t: Date.now() });
 
@@ -357,7 +361,7 @@ export class Agent {
     };
   }
 
-  // ───── plan only ($0.50) — returns config + reasoning, no simulate ─────
+  // ───── plan only ($0.01) — returns config + reasoning, no simulate ─────
 
   async planOnly(
     prompt: string,
@@ -374,11 +378,11 @@ export class Agent {
     emit({ step: "info", message: `Agent wallet: ${this.wallet.publicKey.slice(0, 8)}…`, t: Date.now() });
     emit({ step: "info", message: `Prompt: "${prompt.slice(0, 80)}${prompt.length > 80 ? "…" : ""}"`, t: Date.now() });
     emit({ step: "plan_start", message: `POST http://127.0.0.1:${ENV.API_PORT}/plan`, t: Date.now() });
-    emit({ step: "info", message: `→ Server returns HTTP 402 Payment Required ($0.50 USDC)`, t: Date.now() });
+    emit({ step: "info", message: `→ Server returns HTTP 402 Payment Required ($0.01 USDC)`, t: Date.now() });
     emit({ step: "info", message: `→ @x402/fetch signs Soroban auth entry with agent Ed25519 keypair`, t: Date.now() });
     emit({ step: "info", message: `→ Retrying POST /plan with X-PAYMENT header attached`, t: Date.now() });
     emit({ step: "info", message: `→ Facilitator verifies + submits USDC transfer on-chain`, t: Date.now() });
-    emit({ step: "info", message: `→ Gemma 4 generating session plan (10-30s)…`, t: Date.now() });
+    emit({ step: "info", message: `→ Gemini Flash generating session plan…`, t: Date.now() });
 
     const { plan, trace } = await this.payForPlan({ prompt });
     const ai = (plan as Record<string, unknown>)._ai as
@@ -414,7 +418,7 @@ export class Agent {
     return { plan, trace, reasoning: ai?.reasoning ?? null, model };
   }
 
-  // ───── direct launch (skip /plan, $2.00 only) ─────
+  // ───── direct launch (skip /plan, $0.05 only) ─────
 
   async launchDirect(
     sessionConfig: import("@calypso/shared").SessionConfig,
@@ -429,6 +433,7 @@ export class Agent {
     if (!session) {
       throw new Error(`agent: session ${simulateResult.session_id} not found in store`);
     }
+    session.simulateTrace = simulateTrace;
     void launchSession(session).catch((err) => {
       logger.error({ err, sessionId: session.id }, "agent: launchSession crashed");
     });
@@ -461,6 +466,7 @@ export class Agent {
     }
 
     const teardown = await teardownSession(session);
+    clearSessionKeys(sessionId);
 
     if (session.status !== "failed") {
       session.endedAt = session.endedAt ?? new Date().toISOString();
@@ -517,6 +523,8 @@ export class Agent {
       ai_feedback: session.aiFeedback,
       metrics,
       pnl_summary,
+      plan_trace: session.planTrace ?? null,
+      simulate_trace: session.simulateTrace ?? null,
     };
   }
 }
@@ -554,11 +562,11 @@ function extractTxHashFromResponse(header: string | null): string | null {
 function priceFor(path: "plan" | "simulate" | "analyze"): string {
   switch (path) {
     case "plan":
-      return "$0.50";
+      return "$0.01";
     case "simulate":
-      return "$2.00";
+      return "$0.05";
     case "analyze":
-      return "$0.50";
+      return "$0.01";
   }
 }
 

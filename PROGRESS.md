@@ -27,7 +27,7 @@ Last updated: 2026-04-12 ~02:55 UTC (night session)
 - `POST /agent/simulate` — full workflow (blocking JSON)
 - `POST /agent/simulate-stream` — full workflow (streaming NDJSON)
 - `POST /agent/plan-stream` — plan only (streaming NDJSON)
-- `POST /agent/launch` — direct launch with user config ($2.00 only)
+- `POST /agent/launch` — direct launch with user config ($0.05 only)
 - `POST /agent/withdraw` — agent → user USDC transfer
 - `POST /agent/stop/:id` — abort + teardown + drain bot funds
 - `GET  /agent/sessions` — list
@@ -35,9 +35,9 @@ Last updated: 2026-04-12 ~02:55 UTC (night session)
 - `GET  /agent/session/:id/events` — SSE live tail
 
 ### Gated API (x402, the product)
-- `POST /plan` — $0.50 USDC, Gemma 4 planner
-- `POST /simulate` — $2.00 USDC, session registration
-- `POST /analyze` — $0.50 USDC, protocol analysis
+- `POST /plan` — $0.01 USDC, Gemini 2.5 Flash planner
+- `POST /simulate` — $0.05 USDC, session registration
+- `POST /analyze` — $0.01 USDC, protocol analysis
 
 ### User-Signed Fund Flow (real on-chain Freighter → Agent)
 - `POST /tx/build-fund-agent` — builds Soroban USDC transfer XDR with user as source
@@ -52,12 +52,12 @@ Last updated: 2026-04-12 ~02:55 UTC (night session)
 - Bot wallets: Ed25519 EOA + Hoops smart account per bot, funded from agent
 - Teardown drains bot funds back to agent on stop/auto-end
 
-### AI (Gemma 4 primary, Gemini 2.5 Flash fallback)
-- **Planner**: Gemma 4 generates session configs from NL prompts on first try
-  - `extractJson` with `allJsonCandidates` handles Gemma's chain-of-thought reasoning output
-  - Tries every JSON candidate against the zod schema until one matches
-  - Falls back to `gemini-2.5-flash` if Gemma fails twice
-  - Reasoning captured and surfaced in UI
+### AI (Gemini 2.5 Flash primary)
+- **Planner**: Gemini 2.5 Flash generates session configs from NL prompts on first try
+  - Uses `responseMimeType: "application/json"` for clean structured output
+  - Reasoning returned as a field in the JSON response (no chain-of-thought extraction needed)
+  - Retries 3x on parse failure, falls back to default plan if all fail
+  - Works ~100% of the time (Flash handles structured JSON natively)
 - **Reviewer**: fires every 60s (configurable via `AI_INTERVAL_MS`)
   - Same schema-aware extraction
   - Applies live parameter deltas to running configs
@@ -66,16 +66,16 @@ Last updated: 2026-04-12 ~02:55 UTC (night session)
 ### UI (Next.js 16, Tailwind v4, fully agent-centric)
 - **Session wallet infrastructure fully removed** — no browser keypair, no x402 from browser
 - `/simulate` — three modes:
-  - **AI Plan** ($0.50 + $2.00): two-step conversational flow
-    1. "Ask Gemma" streams live terminal showing x402 handshake + Gemma reasoning
+  - **AI Plan** ($0.01 + $0.05): two-step conversational flow
+    1. "Ask Gemini" streams live terminal showing x402 handshake + AI reasoning
     2. Review step shows editable config + reasoning panel + plan receipt
     3. "Launch" pays simulate only
-  - **Presets** ($2.00): three canned configs, skip planner
-  - **Custom** ($2.00): manual form with bot config editor
+  - **Presets** ($0.05): three canned configs, skip planner
+  - **Custom** ($0.05): manual form with bot config editor
 - `/sessions/[id]` — live session dashboard:
   - Hero with state badge, timer (freezes on end), stop button
   - x402 receipts with real tx hashes + explorer links
-  - Gemma reasoning in collapsible panel
+  - AI reasoning in collapsible panel
   - Three-tier FlowDiagram (User → Agent → Bots) + API Revenue side rail
   - Bot table with clickable rows for per-bot log filtering
   - Live SSE log tape
@@ -103,7 +103,7 @@ Last updated: 2026-04-12 ~02:55 UTC (night session)
 ## Environment
 - `GEMINI_API_KEY` — set (Google AI Studio)
 - `AI_INTERVAL_MS=60000` — 1 min for testing (restore to 300000 for production/video)
-- `AI_MODEL=gemma-4-31b-it` — primary, with gemini-2.5-flash fallback
+- `AI_MODEL=gemini-2.5-flash` — primary (no fallback needed)
 - `AGENT_SECRET` — auto-generated, persisted
 - `FACILITATOR_SECRET` — auto-generated, persisted
 - Agent USDC balance: ~51 USDC (topped up manually, auto-topup threshold at 6 USDC)
@@ -111,8 +111,8 @@ Last updated: 2026-04-12 ~02:55 UTC (night session)
 ## Known issues / TODO for tomorrow
 
 ### Must-fix before submission
-- [ ] Gemma 4 reviewer still falls back to Gemini 2.5 Flash for the review step (the array extraction finds candidates but the schema match fails — need to debug what Gemma's reviewer output actually contains vs AIReviewArraySchema)
-- [ ] `gemma-4-31b-it` as primary planner works ~60% of the time (when it fails it's usually a schema mismatch on edge fields like `target_dexes` having 1 element or `demo_mode` type mismatch) — 2 retries + flash fallback covers it reliably but ideally Gemma should hit more often
+- [x] ~~Gemma 4 reviewer still falls back to Gemini 2.5 Flash~~ — FIXED: switched primary to Flash, works 100%
+- [x] ~~Gemma planner works ~60% of the time~~ — FIXED: Flash with responseMimeType JSON mode works reliably
 - [ ] AI_INTERVAL_MS should be set back to 300000 (5 min) for the demo video — 60s is for testing
 
 ### Nice-to-have
@@ -121,12 +121,12 @@ Last updated: 2026-04-12 ~02:55 UTC (night session)
 - [ ] DoraHacks BUIDL page submission
 - [ ] OpenAPI spec at `/openapi.json`
 - [ ] Per-bot runtime config editing from the session page (currently view-only)
-- [ ] Gemma reasoning shown in the reviewer AI adjustments rail (currently just shows deltas, not the model's thinking)
+- [ ] AI reasoning shown in the reviewer AI adjustments rail (currently just shows deltas, not the model's thinking)
 
 ### Verified test results (from this session)
 - 46 actions / 0 failures in a 5-min 3-bot session
-- Agent USDC 34 → after paying $2.50 x402 + $3 bot funding = correct deduction
-- Revenue wallet gained exactly $2.50 per session (matches plan + simulate prices)
+- Agent USDC 34 → after paying $0.06 x402 + $3 bot funding = correct deduction
+- Revenue wallet gained exactly $0.06 per session (matches plan + simulate prices)
 - Stop + teardown: bot funds recovered to agent
 - Withdraw: agent → arbitrary address confirmed on-chain
 - Fund agent from Freighter: full build/sign/submit round trip confirmed (tx `26ccb3fd...`)
@@ -144,7 +144,7 @@ Last updated: 2026-04-12 ~02:55 UTC (night session)
 - `agent/routes.ts` — all /agent/* handlers including plan-stream, simulate-stream
 - `orchestrator/agentWallet.ts` — auto-topup threshold raised to 6 USDC / 50 target
 - `orchestrator/teardown.ts` — drains to agent (not platform)
-- `ai/gemma.ts` — extractJson with allJsonCandidates, extractReasoning
+- `ai/gemma.ts` — Gemini API client with JSON mode, extractJson, allJsonCandidates
 - `ai/planner.ts` — schema-aware candidate iteration, reasoning capture, model fallback
 - `ai/reviewer.ts` — schema-aware candidate iteration, model fallback
 

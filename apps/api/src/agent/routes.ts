@@ -120,9 +120,9 @@ export async function handleAgentSimulate(req: Request, res: Response): Promise<
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /agent/plan-stream — plan only ($0.50), streams progress + returns
+// POST /agent/plan-stream — plan only ($0.01), streams progress + returns
 // the AI-generated config and reasoning so the user can review/edit before
-// committing the $2.00 simulate payment.
+// committing the $0.05 simulate payment.
 // ─────────────────────────────────────────────────────────────────────────────
 export async function handleAgentPlanStream(req: Request, res: Response): Promise<void> {
   const prompt = String(req.body?.prompt ?? "").trim();

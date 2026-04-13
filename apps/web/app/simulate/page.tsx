@@ -3,9 +3,9 @@
 /**
  * /simulate — three launch modes, full process visibility.
  *
- *   PRESET  — pick a canned config, skip /plan ($2.00 only)
- *   CUSTOM  — build your own config in a form, skip /plan ($2.00 only)
- *   AI PLAN — type a prompt, Gemma 4 generates a config ($2.50 total)
+ *   PRESET  — pick a canned config, skip /plan ($0.05 only)
+ *   CUSTOM  — build your own config in a form, skip /plan ($0.05 only)
+ *   AI PLAN — type a prompt, Gemini Flash generates a config ($0.06 total)
  *             AND shows the LLM's chain-of-thought reasoning
  *
  * Every mode ends with the X402Ceremony modal showing real tx hashes,
@@ -130,7 +130,7 @@ export default function SimulatePage() {
         JSON.stringify({
           plan: plan ?? null,
           simulate: sim ?? null,
-          total_usd: plan ? "$2.50" : "$2.00",
+          total_usd: plan ? "$0.06" : "$0.05",
           ai_reasoning: reasoning ?? null,
           ai_model: model ?? null,
         }),
@@ -138,8 +138,8 @@ export default function SimulatePage() {
     } catch { /* non-fatal */ }
   }
 
-  // ─── AI Step 1: ask Gemma for a plan ($0.50) ───
-  async function askGemma() {
+  // ─── AI Step 1: ask Gemini for a plan ($0.01) ───
+  async function askAI() {
     if (!prompt.trim()) return;
     setAiStep("planning");
     setAiPlan(null);
@@ -162,11 +162,11 @@ export default function SimulatePage() {
     }
   }
 
-  // ─── AI Step 2: launch with reviewed/edited config ($2.00) ───
+  // ─── AI Step 2: launch with reviewed/edited config ($0.05) ───
   async function launchAIPlan() {
     if (!aiConfig || aiBots.length === 0) return;
     const logs: TerminalLine[] = [
-      { t: Date.now(), icon: "→", text: `POST /simulate → agent signing x402 ($2.00 USDC)`, tone: "info" },
+      { t: Date.now(), icon: "→", text: `POST /simulate → agent signing x402 ($0.05 USDC)`, tone: "info" },
       { t: Date.now(), icon: " ", text: `→ HTTP 402 → sign → retry → facilitator settles on-chain`, tone: "default" },
     ];
     setCeremony({ kind: "dispatch", prompt: aiConfig.name, logs });
@@ -182,7 +182,7 @@ export default function SimulatePage() {
         planTrace: aiPlan?.trace ?? null,
         simulateTrace: res.simulate_trace,
         sessionId: res.session_id,
-        totalUsd: "$2.50",
+        totalUsd: "$0.06",
         logs: [...logs],
       });
     } catch (err) {
@@ -202,7 +202,7 @@ export default function SimulatePage() {
   // ─── Preset / Custom direct launch ───
   async function launchDirect(config: SessionConfig, bots: BotConfig[]) {
     const logs: TerminalLine[] = [
-      { t: Date.now(), icon: "→", text: `POST /simulate → agent signing x402 ($2.00 USDC)`, tone: "info" },
+      { t: Date.now(), icon: "→", text: `POST /simulate → agent signing x402 ($0.05 USDC)`, tone: "info" },
     ];
     setCeremony({ kind: "dispatch", prompt: `direct launch: ${config.name}`, logs });
     try {
@@ -216,7 +216,7 @@ export default function SimulatePage() {
         planTrace: null as unknown as X402Trace,
         simulateTrace: res.simulate_trace,
         sessionId: res.session_id,
-        totalUsd: "$2.00",
+        totalUsd: "$0.05",
         logs: [...logs],
       });
     } catch (err) {
@@ -247,7 +247,7 @@ export default function SimulatePage() {
           </h1>
           <p className="mt-4 max-w-[640px] text-muted-foreground leading-relaxed">
             Three ways to configure. <strong className="text-primary">AI Plan</strong> asks
-            Gemma 4 to design the session — you see the LLM&apos;s reasoning and the
+            Gemini Flash to design the session — you see the LLM&apos;s reasoning and the
             generated config. <strong className="text-foreground">Presets</strong> skip the
             AI and use a canned config. <strong className="text-foreground">Custom</strong> lets
             you build it from scratch. Every path ends with a real x402 payment.
@@ -257,7 +257,7 @@ export default function SimulatePage() {
         {/* MODE TABS */}
         <div className="flex items-center gap-1 mb-8">
           {(["ai", "preset", "custom"] as Mode[]).map((m) => {
-            const labels: Record<Mode, string> = { ai: "AI plan · $2.50", preset: "presets · $2.00", custom: "custom · $2.00" };
+            const labels: Record<Mode, string> = { ai: "AI plan · $0.06", preset: "presets · $0.05", custom: "custom · $0.05" };
             return (
               <button
                 key={m}
@@ -283,7 +283,7 @@ export default function SimulatePage() {
                 step 1 of 2 · describe what you want
               </div>
               <div className="font-display text-2xl font-semibold text-paper mb-4">
-                Tell Gemma 4 about your market.
+                Tell Gemini Flash about your market.
               </div>
               <textarea
                 rows={4}
@@ -302,11 +302,11 @@ export default function SimulatePage() {
               </div>
               <div className="mt-6 pt-4 border-t border-border flex items-center justify-between">
                 <div>
-                  <div className="font-mono text-[10px] text-muted-foreground">Gemma 4 designs the session config · you review + edit before launching</div>
+                  <div className="font-mono text-[10px] text-muted-foreground">Gemini Flash designs the session config · you review + edit before launching</div>
                 </div>
-                <button onClick={() => void askGemma()} disabled={!prompt.trim()} type="button"
+                <button onClick={() => void askAI()} disabled={!prompt.trim()} type="button"
                   className="px-6 py-4 border-2 border-primary bg-primary/10 hover:bg-primary/20 disabled:opacity-50 transition-colors">
-                  <span className="font-mono text-xs font-bold uppercase tracking-[0.22em] text-primary">ask gemma · $0.50 →</span>
+                  <span className="font-mono text-xs font-bold uppercase tracking-[0.22em] text-primary">ask gemini · $0.01 →</span>
                 </button>
               </div>
             </div>
@@ -366,7 +366,7 @@ export default function SimulatePage() {
             {aiPlan?.reasoning && (
               <details open className="border border-primary/30 bg-primary/5 corner-marks">
                 <summary className="px-5 py-3 cursor-pointer font-mono text-[10px] uppercase tracking-[0.22em] text-primary hover:text-foreground">
-                  gemma 4 reasoning · model: {aiPlan.model}
+                  ai reasoning · model: {aiPlan.model}
                 </summary>
                 <pre className="px-5 pb-4 text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap max-h-[280px] overflow-y-auto font-mono">
                   {aiPlan.reasoning}
@@ -434,7 +434,7 @@ export default function SimulatePage() {
             {aiPlan?.trace?.payment_tx_hash && (
               <div className="border border-[hsl(var(--ink-stamp)/0.3)] bg-[hsl(var(--ink-stamp)/0.03)] p-4 flex items-center justify-between gap-4">
                 <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                  plan paid · $0.50 USDC · tx{" "}
+                  plan paid · $0.01 USDC · tx{" "}
                   <a href={txExplorerUrl(aiPlan.trace.payment_tx_hash)} target="_blank" rel="noreferrer" className="text-primary hover:underline">
                     {shortHash(aiPlan.trace.payment_tx_hash)}
                   </a>
@@ -447,7 +447,7 @@ export default function SimulatePage() {
 
             <LaunchBar
               label="launch session"
-              price="$2.00 USDC"
+              price="$0.05 USDC"
               sub="1 on-chain settlement · simulate · plan already paid"
               disabled={aiBots.length === 0 || ceremony.kind === "dispatch"}
               onClick={() => void launchAIPlan()}
@@ -477,7 +477,7 @@ export default function SimulatePage() {
                       type="button"
                       className="w-full px-4 py-3 border-2 border-primary bg-primary/10 hover:bg-primary/20 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-primary disabled:opacity-50 transition-colors"
                     >
-                      launch · $2.00
+                      launch · $0.05
                     </button>
                   </div>
                 </div>
@@ -489,7 +489,7 @@ export default function SimulatePage() {
                 what happens (presets skip the AI planner)
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <StepPill idx="1" label="POST /simulate" price="$2.00" desc="Session registered directly with your chosen config" />
+                <StepPill idx="1" label="POST /simulate" price="$0.05" desc="Session registered directly with your chosen config" />
                 <StepPill idx="2" label="x402 settle" price="on-chain" desc="Agent signs auth entry, facilitator settles USDC on Stellar" />
               </div>
             </div>
@@ -544,7 +544,7 @@ export default function SimulatePage() {
 
             <LaunchBar
               label="launch custom session"
-              price="$2.00 USDC"
+              price="$0.05 USDC"
               sub="1 on-chain settlement · simulate only"
               disabled={customBots.length === 0 || ceremony.kind === "dispatch"}
               onClick={() => void launchDirect(customConfig, customBots)}

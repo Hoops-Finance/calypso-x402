@@ -30,9 +30,9 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Calypso Swarm — Paid market simulation on Stellar",
+  title: "Calypso — Agent-paid bot swarms on Stellar",
   description:
-    "Pay-per-call DeFi market simulation for Stellar. x402 USDC micropayments spin up AI-orchestrated bot swarms that trade real Hoops router paths across Soroswap, Phoenix, Comet, and Aquarius.",
+    "Autonomous agents pay USDC micropayments via x402 to spin up trading bot swarms across Soroswap, Aqua, and Phoenix on Stellar testnet. Every API call is a real on-chain settlement.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -58,7 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   className="opacity-70"
                   style={{ filter: "drop-shadow(0 0 6px hsl(var(--primary) / 0.3))" }}
                 />
-                <span className="font-mono">CALYPSO/SWARM · v0.1 · STELLAR TESTNET</span>
+                <span className="font-mono">CALYPSO · STELLAR TESTNET</span>
               </div>
               <div className="font-mono">LOCAL FACILITATOR · x402 PROTOCOL v2</div>
             </div>

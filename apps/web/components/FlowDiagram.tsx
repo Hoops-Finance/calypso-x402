@@ -508,7 +508,7 @@ function BotCard({ bot }: { bot: BotBalances }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DexVenueRow() {
-  const venues = ["Soroswap", "Phoenix", "Aqua", "Comet"];
+  const venues = ["Soroswap", "Phoenix", "Aqua"];
   return (
     <div className="relative border border-dashed border-primary/40 p-5 bg-primary/[0.03]">
       <div className="absolute -top-2 left-5 px-2 py-0.5 bg-primary/20 text-primary font-mono text-[9px] font-bold tracking-[0.22em] uppercase">

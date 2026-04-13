@@ -27,7 +27,7 @@ export const ENV = {
   X402_NETWORK: optional("X402_NETWORK", "stellar:testnet"),
 
   GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? "",
-  AI_MODEL: optional("AI_MODEL", "gemma-4-31b-it"),
+  AI_MODEL: optional("AI_MODEL", "gemini-2.5-flash"),
   AI_INTERVAL_MS: Number(optional("AI_INTERVAL_MS", "300000")),
 
   HOOPS_DATA_API_URL: process.env.HOOPS_DATA_API_URL ?? "",

@@ -45,6 +45,8 @@ export interface AgentReport extends Report {
     eoa: string;
     smart_account: string;
   }>;
+  plan_trace?: X402Trace | null;
+  simulate_trace?: X402Trace | null;
 }
 
 export const API_BASE =

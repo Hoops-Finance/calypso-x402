@@ -2,7 +2,7 @@
  * rateLimit.ts — tiny in-memory token-bucket middleware.
  *
  * Purpose: protect /plan from a cost blowup if somebody hammers the
- * endpoint in a loop, since every hit is a Gemma call. This is NOT a
+ * endpoint in a loop, since every hit is a Gemini call. This is NOT a
  * DoS defense — for that you want a reverse proxy. This is a cost guard.
  *
  * Keyed by client IP (best-effort via x-forwarded-for then req.ip).

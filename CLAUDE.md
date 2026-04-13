@@ -10,9 +10,9 @@ Hackathon submission for Stellar Agents x402 + Stripe MPP.
 - Blockchain: Stellar testnet (Soroban)
 - SDK: @stellar/stellar-sdk
 - Payments: @x402/core, @x402/express, @x402/stellar, @x402/fetch
-- AI: Gemma 4 (`gemma-4-31b-it`) via generativelanguage.googleapis.com
+- AI: Gemini 2.5 Flash (`gemini-2.5-flash`) via generativelanguage.googleapis.com
 - Server: Express
-- UI: Next.js 16 + Tailwind 4 + shadcn/ui
+- UI: Next.js 16 + Tailwind 4 (hand-rolled components, no shadcn)
 - Wallet: @stellar/freighter-api (no StellarWalletsKit, no WalletConnect)
 
 ## Architecture Rules

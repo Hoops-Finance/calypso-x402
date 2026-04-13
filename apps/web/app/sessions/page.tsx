@@ -73,20 +73,25 @@ export default function SessionsIndex() {
               <div className="flex items-center justify-between gap-6">
                 <div className="min-w-0">
                   <div className="font-semibold text-lg">{s.name}</div>
-                  <div className="text-xs text-muted-foreground font-mono truncate">
-                    {s.session_id}
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {new Date(s.started_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {s.bot_count} bot{s.bot_count !== 1 ? "s" : ""}
+                    </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Badge tone={s.status === "running" ? "success" : s.status === "failed" ? "danger" : "default"}>
-                    {s.status}
-                  </Badge>
+                <div className="flex items-center gap-4">
                   <div className="text-right">
                     <div className="text-xs text-muted-foreground">volume</div>
                     <div className="font-mono text-sm">
                       {s.pnl_summary.gross_volume_usd.toFixed(2)}
                     </div>
                   </div>
+                  <Badge tone={s.status === "running" ? "success" : s.status === "failed" ? "danger" : "default"}>
+                    {s.status}
+                  </Badge>
                 </div>
               </div>
             </Card>

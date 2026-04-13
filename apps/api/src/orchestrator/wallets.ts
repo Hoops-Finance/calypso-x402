@@ -93,11 +93,3 @@ export async function createBotWallet(
 
   return { ...session, botId };
 }
-
-/**
- * Best-effort shutdown. Bot teardown (draining residual funds back
- * to the agent) is handled by the dedicated teardown module.
- */
-export async function closeBotWallet(_bot: BotWallet): Promise<void> {
-  return;
-}

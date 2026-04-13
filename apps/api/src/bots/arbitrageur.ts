@@ -4,14 +4,10 @@
  * Each tick:
  *   1. Query getAllQuotes() across every Hoops adapter for a test amount.
  *   2. Compute spread_bps between best and worst quote.
- *   3. If spread >= config.min_spread_bps, execute a swap via the known-
- *      working Soroswap path and log the observed spread.
+ *   3. If spread >= config.min_spread_bps, execute a swap via the best-
+ *      priced adapter (falls back to Soroswap if auth fails).
  *   4. If spread < threshold, log a "skip" with the observed spread so the
  *      AI reviewer can tighten the threshold if the bot is too quiet.
- *
- * v0 executes on Soroswap regardless of which adapter the best quote came
- * from. This is a known limitation documented in hoopsRouter.ts — the real
- * fix is a Soroban auth pattern that lives in the hoops_sdk repo.
  */
 
 import {
@@ -39,10 +35,6 @@ interface Spread {
   worstAmountOut: bigint;
 }
 
-// On testnet, some adapters return stale/absurd quotes (Comet pools with
-// ancient reserves, for example). Cap the displayed spread so the UI log
-// never shows scientific notation. A spread > 10_000bps (>100%) just tells
-// us "mispriced pool", the exact number isn't useful.
 const MAX_DISPLAY_BPS = 10_000;
 
 function computeSpread(
@@ -56,7 +48,6 @@ function computeSpread(
     if (q.amountOut < worst.amountOut) worst = q;
   }
   if (worst.amountOut === 0n) return null;
-  // (best - worst) / worst, in basis points, capped for display.
   const diffScaled = (best.amountOut - worst.amountOut) * 10_000n;
   const rawBps = Number(diffScaled / worst.amountOut);
   const bps = Number.isFinite(rawBps) && rawBps < MAX_DISPLAY_BPS ? rawBps : MAX_DISPLAY_BPS;
@@ -99,11 +90,11 @@ export const arbitrageurTick: TickFn = async ({ bot, config, log }) => {
   const result = await swapXlmToUsdc(bot, probeAmount);
   log({
     action: "swap",
-    dex: "soroswap",
+    dex: result.adapterName as DexId,
     pair: "XLM/USDC",
     amount_in: probeAmount,
     amount_out: Number(fromStroops(result.expectedAmountOut)),
     tx_hash: result.txHash,
-    note: `arb fire: spread=${spreadLabel}bps, best=${ADAPTER_NAME_BY_ID[spread.bestAdapterId]} (executed via soroswap)`,
+    note: `arb fire: spread=${spreadLabel}bps, best=${ADAPTER_NAME_BY_ID[spread.bestAdapterId]}, executed via ${result.adapterName}`,
   });
 };
