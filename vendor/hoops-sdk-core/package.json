@@ -13,7 +13,7 @@
   "scripts": {},
   "dependencies": {
     "@stellar/stellar-sdk": "^14.0.0",
-    "hoops-sdk-types": "file:../hoops-sdk-types"
+    "hoops-sdk-types": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.0"
