@@ -22,9 +22,9 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
-    "hoops-sdk-actions": "file:../../../hoops_sdk/packages/hoops-sdk-actions",
-    "hoops-sdk-core": "file:../../../hoops_sdk/packages/hoops-sdk-core",
-    "hoops-sdk-types": "file:../../../hoops_sdk/packages/hoops-sdk-types",
+    "hoops-sdk-actions": "file:../../vendor/hoops-sdk-actions",
+    "hoops-sdk-core": "file:../../vendor/hoops-sdk-core",
+    "hoops-sdk-types": "file:../../vendor/hoops-sdk-types",
     "pino": "^9.5.0",
     "pino-pretty": "^11.3.0",
     "zod": "^3.23.8"
