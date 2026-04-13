@@ -10,8 +10,9 @@
   },
   "pnpm": {
     "overrides": {
-      "hoops-sdk-types": "file:vendor/hoops-sdk-types",
-      "hoops-sdk-core": "file:vendor/hoops-sdk-core"
+      "hoops-sdk-types": "workspace:*",
+      "hoops-sdk-core": "workspace:*",
+      "hoops-sdk-actions": "workspace:*"
     }
   },
   "scripts": {

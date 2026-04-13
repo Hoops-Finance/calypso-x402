@@ -37,7 +37,7 @@ import { logger } from "../logger.js";
 let sharedServer: rpc.Server | null = null;
 function server(): rpc.Server {
   if (!sharedServer) sharedServer = createRpcClientForNetwork(HOOPS_NETWORK);
-  return sharedServer;
+  return sharedServer!;
 }
 
 let sharedRouter: RouterContract | null = null;
