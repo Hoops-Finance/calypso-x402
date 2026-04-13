@@ -262,11 +262,13 @@ tool-calling and x402-on-Stellar code in the repo family.
 
 ## Quick start
 
-**Requirements:** Node 20+, pnpm 10+, the sibling `hoops_sdk` repo checked
-out at `../hoops_sdk` (Calypso `file:` links into it), a Google AI Studio
-API key (optional — the reviewer logs a one-time warning and skips if unset),
-and the [Freighter](https://freighter.app) browser extension in testnet mode
-if you want to use the `/wallets` fund/withdraw flows.
+**Requirements:** Node 20+, pnpm 10+, a Google AI Studio API key (optional —
+the reviewer logs a one-time warning and skips if unset), and the
+[Freighter](https://freighter.app) browser extension in testnet mode if you
+want to use the `/wallets` fund/withdraw flows.
+
+The Hoops SDK is vendored as compiled JS in `vendor/` — no sibling repo
+checkout needed.
 
 ```bash
 # 1. install everything
@@ -283,7 +285,7 @@ echo "GEMINI_API_KEY=your-key-here" >> .env
 # 4. launch the api (terminal 1)
 pnpm dev:api
 # → :9990 · auto-generates AGENT_SECRET and FACILITATOR_SECRET on first boot
-# → friendbot-funds both + admin-mints starter USDC to the agent
+# → friendbot-funds both keypairs on Stellar testnet
 
 # 5. launch the ui (terminal 2)
 pnpm dev:web
@@ -294,6 +296,22 @@ Then open http://localhost:3000 and click **run a simulation**. No wallet
 required — the Calypso Agent pays for itself out of its startup USDC top-up.
 Connect Freighter only if you want to fund the agent from your own wallet or
 withdraw its balance out.
+
+### USDC on Hoops testnet
+
+Calypso uses a custom USDC token contract deployed on Hoops testnet (not
+Circle's testnet USDC). The "Mint testnet USDC" faucet on the `/wallets`
+page and the agent auto-topup both require `USDC_ADMIN_SECRET` — the admin
+key for this token contract.
+
+If you're running from the Hoops team's `.env`, this key is already set and
+everything works. If you're an external contributor without this key:
+
+- The API still starts and x402 payments still work
+- The agent won't have USDC to pay for API calls until funded
+- You can fund the agent by swapping XLM for USDC via Soroswap on testnet,
+  or by deploying your own USDC contract and setting `USDC_ADMIN_SECRET`
+- Contact the Hoops team for a testnet USDC allocation if needed
 
 ### Smoke scripts
 
